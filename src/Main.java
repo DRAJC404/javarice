@@ -8,9 +8,9 @@ public class Main {
 
         SwingUtilities.invokeLater(() -> {
 
-            Loginframe login = new Loginframe();
+            Loginframe loginFrame = new Loginframe();
 
-            login.setVisible(true);
+            loginFrame.setVisible(true);
         });
     }
 }
