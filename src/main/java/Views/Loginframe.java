@@ -1,6 +1,7 @@
 package Views;
 
 import Models.User;
+import Utils.Theme;
 import Utils.ValidationUtils;
 
 import javax.swing.*;
@@ -13,12 +14,12 @@ public class Loginframe extends JFrame {
     private JPasswordField passwordField;
     private JLabel errorLabel;
 
-    private static final Color BACKGROUND = new Color(15, 23, 42);
-    private static final Color CARD = new Color(30, 41, 59);
-    private static final Color PRIMARY = new Color(59, 130, 246);
-    private static final Color TEXT = new Color(248, 250, 252);
-    private static final Color MUTED = new Color(148, 163, 184);
-    private static final Color ERROR = new Color(248, 113, 113);
+    private static final Color BACKGROUND = Theme.BACKGROUND;
+    private static final Color CARD = Theme.CARD;
+    private static final Color PRIMARY = Theme.PRIMARY;
+    private static final Color TEXT = Theme.TEXT;
+    private static final Color MUTED = Theme.MUTED;
+    private static final Color ERROR = Theme.ERROR;
 
     public Loginframe() {
 
