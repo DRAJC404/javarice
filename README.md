@@ -1,29 +1,43 @@
-# bAI — AI Assistant Business
+# bAI — AI Business Assistant
 
-**bAI (AI Assistant Business)** is a Java Swing desktop application designed to help businesses manage their daily operations, including products, inventory, sales, reports, and AI-assisted business features.
+**bAI (AI Business Assistant)** is a JavaFX desktop application designed to help businesses manage their daily operations, including products, inventory, sales, reports, and AI-assisted business features.
+
+The application uses **JavaFX** for the graphical user interface and **Maven** for project and dependency management.
 
 ---
 
-## Requirements
+# Requirements
 
 Before running the project, make sure you have:
 
 * **Java JDK 21**
 * **Git**
 
-> **Maven does NOT need to be installed.**
->
-> This project uses **Maven Wrapper**, which is included in the repository.
+Maven does **not** need to be installed manually.
 
-Check Java:
+This project uses the **Maven Wrapper**, which is included in the repository.
+
+JavaFX is also managed through Maven, so there is **no need to manually install the JavaFX SDK**.
+
+## Check Java
+
+### Windows
 
 ```cmd
 java -version
 ```
 
-Check Git:
+### Linux / macOS
 
-```cmd
+```bash
+java -version
+```
+
+You should have Java 21 installed.
+
+## Check Git
+
+```bash
 git --version
 ```
 
@@ -33,26 +47,34 @@ git --version
 
 ## 1. Clone the Repository
 
-Open **Command Prompt** or **PowerShell**:
+Open **Command Prompt**, **PowerShell**, or a terminal.
 
-```cmd
+```bash
 git clone <repository-url>
 ```
 
 Enter the project folder:
 
-```cmd
+```bash
 cd bAI
 ```
 
 ---
 
-## 2. Compile the Project
+# 2. Compile the Project
 
-Run:
+The Maven Wrapper handles Maven for you.
+
+### Windows
 
 ```cmd
 mvnw.cmd clean compile
+```
+
+### Linux / macOS
+
+```bash
+./mvnw clean compile
 ```
 
 Wait until you see:
@@ -61,80 +83,66 @@ Wait until you see:
 BUILD SUCCESS
 ```
 
-If you get `BUILD FAILURE`, **do not run the application yet**. Fix the compilation errors first.
+If you get `BUILD FAILURE`, fix the compilation errors before running the application.
 
 ---
 
-## 3. Run the Application
+# 3. Run the JavaFX Application
 
 After a successful compilation:
 
+### Windows
+
 ```cmd
-mvnw.cmd exec:java
+mvnw.cmd javafx:run
 ```
 
-The **bAI — AI Assistant Business** application should start.
+### Linux / macOS
+
+```bash
+./mvnw javafx:run
+```
+
+The **bAI — AI Business Assistant** JavaFX application should start.
 
 ---
 
 # Quick Start
 
-After cloning:
+## Windows
 
 ```cmd
 git clone <repository-url>
 cd bAI
 mvnw.cmd clean compile
-mvnw.cmd exec:java
+mvnw.cmd javafx:run
+```
+
+## Linux / macOS
+
+```bash
+git clone <repository-url>
+cd bAI
+./mvnw clean compile
+./mvnw javafx:run
 ```
 
 ---
 
-# After Making Changes
+# JavaFX
 
-Whenever you modify, add, or delete Java files:
+This project uses:
 
-### Step 1 — Compile
+* **Java 21**
+* **JavaFX 21**
+* **JavaFX Controls**
+* **JavaFX FXML**
+* **JavaFX CSS**
+* **Maven**
 
-```cmd
-mvnw.cmd clean compile
-```
+JavaFX dependencies are automatically downloaded by Maven based on the project's `pom.xml`.
 
-### Step 2 — Make sure it says:
-
-```text
-BUILD SUCCESS
-```
-
-### Step 3 — Run
-
-```cmd
-mvnw.cmd exec:java
-```
-
-### In short:
-
-```cmd
-mvnw.cmd clean compile
-mvnw.cmd exec:java
-```
-
----
-
-# Getting the Latest Changes
-
-Before starting your work, always get the latest changes:
-
-```cmd
-git pull
-```
-
-Then compile and run:
-
-```cmd
-mvnw.cmd clean compile
-mvnw.cmd exec:java
-```
+You do **not** need to manually download the JavaFX SDK.
 
 ---
 
@@ -156,8 +164,7 @@ bAI/
 │   └── ValidationUtils.java
 │
 ├── Views/
-│   ├── DashboardFrame.java
-│   └── Loginframe.java
+│   └── JavaFX views/controllers
 │
 ├── src/
 │   └── Main.java
@@ -171,6 +178,8 @@ bAI/
 └── .gitignore
 ```
 
+As the JavaFX application develops, the `Views` folder may contain JavaFX controllers and related GUI classes, while FXML and CSS files can be stored under the project's resources directory.
+
 ---
 
 # Folder Responsibilities
@@ -179,7 +188,9 @@ bAI/
 
 Contains the graphical user interface of the application.
 
-Examples:
+The application uses **JavaFX** instead of Java Swing.
+
+Possible screens include:
 
 * Login
 * Dashboard
@@ -188,6 +199,20 @@ Examples:
 * Sales
 * Reports
 * AI Assistant
+
+JavaFX components may include:
+
+* `Stage`
+* `Scene`
+* `Button`
+* `Label`
+* `TextField`
+* `TableView`
+* `ComboBox`
+* `VBox`
+* `HBox`
+* `BorderPane`
+* `GridPane`
 
 ---
 
@@ -202,6 +227,7 @@ Examples:
 * Sales processing
 * Database operations
 * AI API communication
+* Business calculations
 
 ---
 
@@ -216,6 +242,7 @@ User
 Product
 Inventory
 Sale
+Transaction
 ```
 
 ---
@@ -229,12 +256,20 @@ Examples:
 * Input validation
 * Formatting
 * Common utility functions
+* Application helpers
 
 ---
 
 ## `database/`
 
 Contains SQL files used for creating and setting up the database.
+
+Example:
+
+```text
+database/
+└── database.sql
+```
 
 ---
 
@@ -243,8 +278,112 @@ Contains SQL files used for creating and setting up the database.
 Contains the main entry point of the application.
 
 ```text
-Main.java
+src/
+└── Main.java
 ```
+
+The main class starts the JavaFX application.
+
+---
+
+# JavaFX Architecture
+
+The application separates the graphical interface from the business logic.
+
+The general flow is:
+
+```text
+        JavaFX UI
+            │
+            ▼
+       Controller
+            │
+            ▼
+        Services
+            │
+            ▼
+         Models
+            │
+            ▼
+        Database
+```
+
+For example:
+
+```text
+Products.fxml
+      │
+      ▼
+ProductController.java
+      │
+      ▼
+ProductService.java
+      │
+      ▼
+Product.java
+      │
+      ▼
+Database
+```
+
+This separation makes the application easier to maintain and allows different team members to work on different parts of the project.
+
+---
+
+# FXML
+
+FXML can be used to define JavaFX user interfaces separately from Java code.
+
+Example:
+
+```text
+resources/
+└── fxml/
+    ├── Login.fxml
+    ├── Dashboard.fxml
+    ├── Products.fxml
+    └── Reports.fxml
+```
+
+FXML defines the interface, while the Java controller handles its behavior.
+
+Example:
+
+```text
+FXML
+ │
+ ▼
+Controller
+ │
+ ▼
+Service
+```
+
+---
+
+# CSS
+
+JavaFX supports CSS for styling the application's interface.
+
+Example:
+
+```text
+resources/
+└── css/
+    └── style.css
+```
+
+CSS can be used for:
+
+* Colors
+* Fonts
+* Buttons
+* Backgrounds
+* Borders
+* Spacing
+* UI themes
+
+This allows the team to modify the application's appearance without changing the main application logic.
 
 ---
 
@@ -254,51 +393,193 @@ Each team member should follow this workflow:
 
 ```text
         git pull
-           ↓
-     Make your changes
-           ↓
-  mvnw.cmd clean compile
-           ↓
-      BUILD SUCCESS?
-        ↙       ↘
+           │
+           ▼
+    Make your changes
+           │
+           ▼
+    Compile the project
+           │
+           ▼
+     BUILD SUCCESS?
+        /       \
       NO         YES
-      ↓           ↓
-  Fix errors   Run application
-                  ↓
-          mvnw.cmd exec:java
-                  ↓
+      │           │
+      ▼           ▼
+  Fix errors   Run JavaFX
+                  │
+                  ▼
              Test your work
-                  ↓
-            git add .
-                  ↓
+                  │
+                  ▼
+              git add .
+                  │
+                  ▼
           git commit -m "..."
-                  ↓
+                  │
+                  ▼
               git push
+```
+
+---
+
+# Compile and Run
+
+## Windows
+
+Compile:
+
+```cmd
+mvnw.cmd clean compile
+```
+
+Run:
+
+```cmd
+mvnw.cmd javafx:run
+```
+
+## Linux / macOS
+
+Compile:
+
+```bash
+./mvnw clean compile
+```
+
+Run:
+
+```bash
+./mvnw javafx:run
+```
+
+---
+
+# After Making Changes
+
+Whenever you modify, add, or delete Java files:
+
+## Step 1 — Compile
+
+### Windows
+
+```cmd
+mvnw.cmd clean compile
+```
+
+### Linux / macOS
+
+```bash
+./mvnw clean compile
+```
+
+## Step 2 — Make sure it says
+
+```text
+BUILD SUCCESS
+```
+
+## Step 3 — Run the application
+
+### Windows
+
+```cmd
+mvnw.cmd javafx:run
+```
+
+### Linux / macOS
+
+```bash
+./mvnw javafx:run
+```
+
+## In short
+
+### Windows
+
+```cmd
+mvnw.cmd clean compile
+mvnw.cmd javafx:run
+```
+
+### Linux / macOS
+
+```bash
+./mvnw clean compile
+./mvnw javafx:run
+```
+
+---
+
+# Getting the Latest Changes
+
+Before starting your work, always get the latest changes:
+
+```bash
+git pull
+```
+
+Then compile and run the application.
+
+### Windows
+
+```cmd
+mvnw.cmd clean compile
+mvnw.cmd javafx:run
+```
+
+### Linux / macOS
+
+```bash
+./mvnw clean compile
+./mvnw javafx:run
 ```
 
 ---
 
 # Git Workflow
 
-Before starting:
+## Before Starting Work
 
-```cmd
+Always get the latest changes:
+
+```bash
 git pull
 ```
 
-After making changes:
+## After Making Changes
 
-```cmd
+Check your changes:
+
+```bash
+git status
+```
+
+Add your changes:
+
+```bash
 git add .
+```
+
+Commit your changes:
+
+```bash
 git commit -m "Describe your changes"
+```
+
+Push your changes:
+
+```bash
 git push
 ```
 
 Example:
 
-```cmd
+```bash
 git add .
+
 git commit -m "Add product management UI"
+
 git push
 ```
 
@@ -306,10 +587,20 @@ git push
 
 # Important Rules
 
-### 1. Always compile before pushing
+## 1. Always Compile Before Pushing
+
+Make sure the project compiles successfully before pushing your changes.
+
+### Windows
 
 ```cmd
 mvnw.cmd clean compile
+```
+
+### Linux / macOS
+
+```bash
+./mvnw clean compile
 ```
 
 Make sure you get:
@@ -318,7 +609,9 @@ Make sure you get:
 BUILD SUCCESS
 ```
 
-### 2. Do not commit generated files
+---
+
+## 2. Do Not Commit Generated Files
 
 Do **not** commit:
 
@@ -327,72 +620,121 @@ target/
 *.class
 ```
 
-These are already included in `.gitignore`.
+These files should remain in `.gitignore`.
 
-### 3. Do not commit `.env`
+---
 
-Never push API keys, passwords, or other secrets to Git.
+## 3. Do Not Commit `.env`
+
+Never push API keys, passwords, database credentials, or other secrets to Git.
+
+Do not commit:
 
 ```text
 .env
 ```
 
-should remain in `.gitignore`.
+Make sure `.env` is included in `.gitignore`.
 
-### 4. If compilation fails
+---
+
+## 4. If Compilation Fails
 
 Do not push broken code.
 
-Fix the errors first:
+Fix the errors first.
+
+### Windows
 
 ```cmd
 mvnw.cmd clean compile
 ```
 
-Then run:
+### Linux / macOS
+
+```bash
+./mvnw clean compile
+```
+
+After receiving:
+
+```text
+BUILD SUCCESS
+```
+
+run the application:
+
+### Windows
 
 ```cmd
-mvnw.cmd exec:java
+mvnw.cmd javafx:run
+```
+
+### Linux / macOS
+
+```bash
+./mvnw javafx:run
 ```
 
 ---
 
 # Common Commands
 
-### Compile
+## Compile
+
+### Windows
 
 ```cmd
 mvnw.cmd clean compile
 ```
 
-### Run
+### Linux / macOS
 
-```cmd
-mvnw.cmd exec:java
+```bash
+./mvnw clean compile
 ```
 
-### Get latest changes
+## Run JavaFX
+
+### Windows
 
 ```cmd
+mvnw.cmd javafx:run
+```
+
+### Linux / macOS
+
+```bash
+./mvnw javafx:run
+```
+
+## Get Latest Changes
+
+```bash
 git pull
 ```
 
-### Check Git status
+## Check Git Status
 
-```cmd
+```bash
 git status
 ```
 
-### Commit changes
+## Add Changes
 
-```cmd
+```bash
 git add .
+```
+
+## Commit Changes
+
+```bash
 git commit -m "Your message"
 ```
 
-### Push changes
+## Push Changes
 
-```cmd
+```bash
 git push
 ```
 
@@ -400,25 +742,140 @@ git push
 
 # Team Setup
 
-Every team member only needs:
+Every team member needs:
 
 ```text
 Git
 JDK 21
 ```
 
-Maven is already handled by:
+Maven does **not** need to be installed manually.
+
+The project includes the Maven Wrapper:
 
 ```text
+mvnw
 mvnw.cmd
 ```
 
-Therefore, there is **no need to install Maven manually**.
+JavaFX dependencies are automatically handled by Maven through `pom.xml`.
 
 ---
 
-## bAI
+# Maven Wrapper
 
-**AI Assistant Business**
+The Maven Wrapper allows the project to use Maven without requiring each team member to install Maven separately.
 
-A simple desktop business management system with AI-assisted features.
+### Windows
+
+```cmd
+mvnw.cmd clean compile
+```
+
+### Linux / macOS
+
+```bash
+./mvnw clean compile
+```
+
+If Linux gives a permission error:
+
+```bash
+chmod +x mvnw
+```
+
+Then:
+
+```bash
+./mvnw clean compile
+```
+
+---
+
+# Troubleshooting
+
+## Java Version
+
+Check your Java version:
+
+```bash
+java -version
+```
+
+The project requires:
+
+```text
+Java 21
+```
+
+---
+
+## Maven Build Failure
+
+Try:
+
+```bash
+./mvnw clean compile
+```
+
+If you are using Windows:
+
+```cmd
+mvnw.cmd clean compile
+```
+
+Read the compilation error and fix it before running the application.
+
+---
+
+## JavaFX Application Does Not Start
+
+Make sure the project compiles successfully first:
+
+```bash
+./mvnw clean compile
+```
+
+Then run:
+
+```bash
+./mvnw javafx:run
+```
+
+---
+
+# Project Technology
+
+```text
+Language:
+Java 21
+
+GUI:
+JavaFX
+
+UI Markup:
+FXML
+
+Styling:
+JavaFX CSS
+
+Build Tool:
+Maven
+
+Database:
+[Add database here]
+
+AI:
+[Add AI API/service here]
+
+Version Control:
+Git / GitHub
+```
+
+---
+
+# bAI
+
+**AI Business Assistant**
+
+A JavaFX desktop business management application with AI-assisted features designed to help businesses manage products, inventory, sales, reports, and business operations.

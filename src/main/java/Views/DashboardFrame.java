@@ -2,6 +2,7 @@ package Views;
 
 import Models.User;
 import Services.ProductService;
+import Utils.Theme;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -12,12 +13,12 @@ public class DashboardFrame extends JFrame {
     private final User user;
     private final ProductService productService;
 
-    private static final Color BACKGROUND = new Color(15, 23, 42);
-    private static final Color SIDEBAR = new Color(17, 24, 39);
-    private static final Color CARD = new Color(30, 41, 59);
-    private static final Color PRIMARY = new Color(59, 130, 246);
-    private static final Color TEXT = new Color(248, 250, 252);
-    private static final Color MUTED = new Color(148, 163, 184);
+        private static final Color BACKGROUND = Theme.BACKGROUND;
+        private static final Color SIDEBAR = Theme.SIDEBAR;
+        private static final Color CARD = Theme.CARD;
+        private static final Color PRIMARY = Theme.PRIMARY;
+        private static final Color TEXT = Theme.TEXT;
+        private static final Color MUTED = Theme.MUTED;
 
     public DashboardFrame(User user) {
 
