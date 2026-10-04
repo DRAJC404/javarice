@@ -1,265 +1,289 @@
 package Views;
 
 import Models.User;
-import Utils.Theme;
 import Utils.ValidationUtils;
 
-import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import java.awt.*;
+import javafx.animation.ScaleTransition;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.css.PseudoClass;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+import javafx.util.Duration;
 
-public class Loginframe extends JFrame {
+import javax.swing.SwingUtilities;
+import java.util.regex.Pattern;
 
-    private JTextField usernameField;
-    private JPasswordField passwordField;
-    private JLabel errorLabel;
+public class Loginframe extends Application {
 
-    private static final Color BACKGROUND = Theme.BACKGROUND;
-    private static final Color CARD = Theme.CARD;
-    private static final Color PRIMARY = Theme.PRIMARY;
-    private static final Color TEXT = Theme.TEXT;
-    private static final Color MUTED = Theme.MUTED;
-    private static final Color ERROR = Theme.ERROR;
+    private static final PseudoClass ACTIVE = PseudoClass.getPseudoClass("active");
+    private static final PseudoClass OFF = PseudoClass.getPseudoClass("off");
+    private static final PseudoClass SHOWN = PseudoClass.getPseudoClass("shown");
 
-    public Loginframe() {
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+$");
 
-        setTitle("bAI");
-        setSize(900, 600);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);
-        setResizable(false);
+    private Stage stage;
 
-        createUI();
+    private TextField emailField;
+    private PasswordField passwordField;
+    private TextField visibleField;
+    private Label errorLabel;
+
+    public static void open() {
+        Platform.runLater(() -> new Loginframe().start(new Stage()));
     }
 
-    private void createUI() {
+    @Override
+    public void start(Stage primaryStage) {
 
-        JPanel mainPanel = new JPanel(new GridLayout(1, 2));
-        mainPanel.setBackground(BACKGROUND);
+        Platform.setImplicitExit(false);
 
-        JPanel leftPanel = new JPanel();
-        leftPanel.setBackground(PRIMARY);
-        leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
-        leftPanel.setBorder(new EmptyBorder(80, 50, 80, 50));
+        this.stage = primaryStage;
 
-        JLabel logo = new JLabel("bAI");
-        logo.setFont(new Font("SansSerif", Font.BOLD, 64));
-        logo.setForeground(Color.WHITE);
-        logo.setAlignmentX(Component.LEFT_ALIGNMENT);
+        stage.setOnCloseRequest(e -> Platform.exit());
 
-        JLabel title = new JLabel(
-                "<html>AI Assistant Business</html>");
-        title.setFont(new Font("SansSerif", Font.BOLD, 32));
-        title.setForeground(Color.WHITE);
-        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+        HBox root = new HBox(buildImagePane(), buildLoginPane());
+        root.getStyleClass().add("root-box");
 
-        JLabel description = new JLabel(
-                "<html>Your intelligent assistant for<br>" +
-                        "managing and understanding your business.</html>");
-        description.setFont(new Font("SansSerif", Font.PLAIN, 16));
-        description.setForeground(new Color(219, 234, 254));
-        description.setAlignmentX(Component.LEFT_ALIGNMENT);
+        Scene scene = new Scene(root, 900, 600);
+        scene.getStylesheets().add(
+                getClass().getResource("/css/login.css").toExternalForm());
 
-        leftPanel.add(logo);
-        leftPanel.add(Box.createVerticalStrut(20));
-        leftPanel.add(title);
-        leftPanel.add(Box.createVerticalStrut(20));
-        leftPanel.add(description);
+        stage.setTitle("bAI");
+        stage.setScene(scene);
+        stage.setResizable(false);
+        stage.centerOnScreen();
+        stage.show();
+    }
 
-        JPanel rightPanel = new JPanel();
-        rightPanel.setBackground(BACKGROUND);
-        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
-        rightPanel.setBorder(new EmptyBorder(100, 60, 80, 60));
+    private VBox buildLoginPane() {
 
-        JLabel loginTitle = new JLabel("Welcome back");
-        loginTitle.setFont(new Font("SansSerif", Font.BOLD, 30));
-        loginTitle.setForeground(TEXT);
-        loginTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        VBox pane = new VBox();
+        pane.getStyleClass().add("login-pane");
+        pane.setAlignment(Pos.CENTER_LEFT);
+        pane.setPrefWidth(450);
+        pane.setMinWidth(450);
+        pane.setMaxWidth(450);
 
-        JLabel loginSubtitle = new JLabel("Sign in to continue to your dashboard");
-        loginSubtitle.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        loginSubtitle.setForeground(MUTED);
-        loginSubtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        Region logo = new Region();
+        logo.getStyleClass().add("logo");
+        VBox.setMargin(logo, new Insets(0, 0, 0, 0));
 
-        rightPanel.add(loginTitle);
-        rightPanel.add(Box.createVerticalStrut(8));
-        rightPanel.add(loginSubtitle);
+        Label title = new Label("HI, welcome to bAI");
+        title.getStyleClass().add("title");
+        VBox.setMargin(title, new Insets(0, 0, 8, 0));
 
-        rightPanel.add(Box.createVerticalStrut(35));
+        Label subtitle = new Label("Enter your credentials to access your account");
+        subtitle.getStyleClass().add("subtitle");
+        VBox.setMargin(subtitle, new Insets(0, 0, 30, 0));
 
-        JLabel usernameLabel = createLabel("Username");
-        usernameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        Label emailLabel = new Label("Email");
+        emailLabel.getStyleClass().add("field-label");
+        VBox.setMargin(emailLabel, new Insets(0, 0, 8, 0));
 
-        usernameField = new JTextField();
-        styleTextField(usernameField);
-        usernameField.setAlignmentX(Component.LEFT_ALIGNMENT);
+        emailField = new TextField();
+        emailField.setPromptText("you@example.com");
+        emailField.getStyleClass().add("input");
+        VBox.setMargin(emailField, new Insets(0, 0, 18, 0));
 
-        rightPanel.add(usernameLabel);
-        rightPanel.add(Box.createVerticalStrut(8));
-        rightPanel.add(usernameField);
+        Label passwordLabel = new Label("Password");
+        passwordLabel.getStyleClass().add("field-label");
+        VBox.setMargin(passwordLabel, new Insets(0, 0, 8, 0));
 
-        rightPanel.add(Box.createVerticalStrut(20));
+        passwordField = new PasswordField();
+        passwordField.setPromptText("Enter your password");
+        passwordField.getStyleClass().add("plain-field");
 
-        JLabel passwordLabel = createLabel("Password");
-        passwordLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        visibleField = new TextField();
+        visibleField.setPromptText("Enter your password");
+        visibleField.getStyleClass().add("plain-field");
+        visibleField.setVisible(false);
+        visibleField.setManaged(false);
 
-        JPanel passwordPanel = new JPanel(new BorderLayout());
-        passwordPanel.setBackground(CARD);
-        passwordPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 45));
-        passwordPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        visibleField.textProperty().bindBidirectional(passwordField.textProperty());
 
-        passwordField = new JPasswordField();
-        passwordField.setBackground(CARD);
-        passwordField.setForeground(TEXT);
-        passwordField.setCaretColor(TEXT);
-        passwordField.setBorder(new EmptyBorder(0, 12, 0, 0));
-        passwordField.setFont(new Font("SansSerif", Font.PLAIN, 15));
+        StackPane fieldStack = new StackPane(passwordField, visibleField);
+        HBox.setHgrow(fieldStack, Priority.ALWAYS);
 
-        JButton showPasswordButton = new JButton("Show");
-        showPasswordButton.setFocusPainted(false);
-        showPasswordButton.setBorderPainted(false);
-        showPasswordButton.setBackground(CARD);
-        showPasswordButton.setForeground(MUTED);
-        showPasswordButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        Region eyeIcon = new Region();
+        eyeIcon.getStyleClass().add("eye-icon");
 
-        showPasswordButton.addActionListener(e -> {
+        Tooltip eyeTip = new Tooltip("Show password");
 
-            if (passwordField.getEchoChar() == '\u0000') {
-                passwordField.setEchoChar('•');
-                showPasswordButton.setText("Show");
-            } else {
-                passwordField.setEchoChar('\u0000');
-                showPasswordButton.setText("Hide");
-            }
+        Button eyeButton = new Button();
+        eyeButton.setGraphic(eyeIcon);
+        eyeButton.getStyleClass().add("eye-button");
+        eyeButton.setFocusTraversable(false);
+        eyeButton.setTooltip(eyeTip);
+        HBox.setMargin(eyeButton, new Insets(0, 6, 0, 0));
+
+        HBox passwordBox = new HBox(fieldStack, eyeButton);
+        passwordBox.getStyleClass().add("field-box");
+        passwordBox.setAlignment(Pos.CENTER_LEFT);
+
+        eyeButton.setOnAction(e -> {
+            boolean show = !visibleField.isVisible();
+
+            visibleField.setVisible(show);
+            visibleField.setManaged(show);
+            passwordField.setVisible(!show);
+            passwordField.setManaged(!show);
+
+            eyeIcon.pseudoClassStateChanged(OFF, show);
+            eyeButton.pseudoClassStateChanged(SHOWN, show);
+            eyeTip.setText(show ? "Hide password" : "Show password");
+
+            ScaleTransition pop = new ScaleTransition(Duration.millis(150), eyeIcon);
+            pop.setFromX(0.65);
+            pop.setFromY(0.65);
+            pop.setToX(1.0);
+            pop.setToY(1.0);
+            pop.play();
+
+            TextField active = show ? visibleField : passwordField;
+            active.requestFocus();
+            active.positionCaret(active.getText().length());
         });
 
-        passwordPanel.add(passwordField, BorderLayout.CENTER);
-        passwordPanel.add(showPasswordButton, BorderLayout.EAST);
+        Runnable updateFocus = () -> passwordBox.pseudoClassStateChanged(
+                ACTIVE, passwordField.isFocused() || visibleField.isFocused());
+        passwordField.focusedProperty().addListener((o, a, b) -> updateFocus.run());
+        visibleField.focusedProperty().addListener((o, a, b) -> updateFocus.run());
 
-        rightPanel.add(passwordLabel);
-        rightPanel.add(Box.createVerticalStrut(8));
-        rightPanel.add(passwordPanel);
+        errorLabel = new Label(" ");
+        errorLabel.getStyleClass().add("error");
+        VBox.setMargin(errorLabel, new Insets(8, 0, 8, 0));
 
-        errorLabel = new JLabel(" ");
-        errorLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
-        errorLabel.setForeground(ERROR);
-        errorLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        Button loginButton = new Button("Sign In");
+        loginButton.getStyleClass().add("sign-in");
+        loginButton.setMaxWidth(Double.MAX_VALUE);
+        loginButton.setDefaultButton(true);
+        loginButton.setOnAction(e -> login());
 
-        rightPanel.add(Box.createVerticalStrut(10));
-        rightPanel.add(errorLabel);
+        emailField.setOnAction(e -> focusPassword());
+        passwordField.setOnAction(e -> login());
+        visibleField.setOnAction(e -> login());
 
-        JButton loginButton = new JButton("Sign In");
-        styleButton(loginButton);
-        loginButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+        Label noAccount = new Label("Don't have an account?");
+        noAccount.getStyleClass().add("muted-text");
 
-        loginButton.addActionListener(e -> login());
+        Hyperlink registerLink = new Hyperlink("Register here");
+        registerLink.getStyleClass().add("register-link");
+        registerLink.setFocusTraversable(false);
+        registerLink.setOnAction(e -> openRegister());
 
-        passwordField.addActionListener(e -> login());
+        HBox registerRow = new HBox(2, noAccount, registerLink);
+        registerRow.setAlignment(Pos.CENTER);
+        VBox.setMargin(registerRow, new Insets(18, 0, 0, 0));
 
-        rightPanel.add(Box.createVerticalStrut(10));
-        rightPanel.add(loginButton);
+        pane.getChildren().addAll(
+                logo,
+                title, subtitle,
+                emailLabel, emailField,
+                passwordLabel, passwordBox,
+                errorLabel,
+                loginButton,
+                registerRow);
 
-        mainPanel.add(leftPanel);
-        mainPanel.add(rightPanel);
+        return pane;
+    }
 
-        add(mainPanel);
+    private StackPane buildImagePane() {
+
+        Region tint = new Region();
+        tint.getStyleClass().add("image-tint");
+
+        Region vignette = new Region();
+        vignette.getStyleClass().add("image-vignette");
+
+        StackPane pane = new StackPane(tint, vignette);
+        pane.getStyleClass().add("image-pane");
+        pane.setPrefWidth(450);
+        HBox.setHgrow(pane, Priority.ALWAYS);
+
+        return pane;
+    }
+
+    private void openRegister() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Register");
+        alert.setHeaderText(null);
+        alert.setContentText("The registration screen is coming soon.");
+        alert.initOwner(stage);
+        alert.showAndWait();
     }
 
     private void login() {
 
-        String username = usernameField.getText().trim();
-        String password = new String(passwordField.getPassword());
+        String email = emailField.getText().trim();
+        String password = passwordField.getText();
 
-        if (ValidationUtils.isEmpty(username)) {
-            showError("Username is required.");
-            usernameField.requestFocus();
+        if (ValidationUtils.isEmpty(email)) {
+            showError("Email is required.");
+            emailField.requestFocus();
+            return;
+        }
+
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
+            showError("Please enter a valid email address.");
+            emailField.requestFocus();
             return;
         }
 
         if (ValidationUtils.isEmpty(password)) {
             showError("Password is required.");
-            passwordField.requestFocus();
-            return;
-        }
-
-        if (!ValidationUtils.isValidUsername(username)) {
-            showError("Username must be at least 3 characters.");
-            usernameField.requestFocus();
+            focusPassword();
             return;
         }
 
         if (!ValidationUtils.isValidPassword(password)) {
             showError("Password must be at least 4 characters.");
-            passwordField.requestFocus();
+            focusPassword();
             return;
         }
 
         User user = new User(
-                "admin",
+                "admin@gmail.com",
                 "1234",
                 "Administrator");
 
-        if (username.equals(user.getUsername())
+        if (email.equalsIgnoreCase(user.getUsername())
                 && password.equals(user.getPassword())) {
 
             errorLabel.setText(" ");
 
-            new DashboardFrame(user).setVisible(true);
+            SwingUtilities.invokeLater(() -> new DashboardFrame(user).setVisible(true));
 
-            dispose();
+            stage.hide();
 
         } else {
 
-            showError("Invalid username or password.");
-            passwordField.setText("");
-            passwordField.requestFocus();
+            showError("Invalid email or password.");
+            passwordField.clear();
+            focusPassword();
         }
+    }
+
+    private void focusPassword() {
+        (visibleField.isVisible() ? visibleField : passwordField).requestFocus();
     }
 
     private void showError(String message) {
         errorLabel.setText(message);
-    }
-
-    private JLabel createLabel(String text) {
-
-        JLabel label = new JLabel(text);
-
-        label.setFont(
-                new Font("SansSerif", Font.BOLD, 13));
-
-        label.setForeground(TEXT);
-
-        return label;
-    }
-
-    private void styleTextField(JTextField field) {
-
-        field.setBackground(CARD);
-        field.setForeground(TEXT);
-        field.setCaretColor(TEXT);
-        field.setBorder(
-                new EmptyBorder(0, 12, 0, 12));
-
-        field.setFont(
-                new Font("SansSerif", Font.PLAIN, 15));
-
-        field.setMaximumSize(
-                new Dimension(Integer.MAX_VALUE, 45));
-    }
-
-    private void styleButton(JButton button) {
-
-        button.setBackground(PRIMARY);
-        button.setForeground(Color.WHITE);
-        button.setFont(
-                new Font("SansSerif", Font.BOLD, 15));
-
-        button.setBorderPainted(false);
-        button.setFocusPainted(false);
-        button.setCursor(
-                new Cursor(Cursor.HAND_CURSOR));
-
-        button.setMaximumSize(
-                new Dimension(Integer.MAX_VALUE, 45));
     }
 }

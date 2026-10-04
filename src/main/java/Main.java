@@ -1,16 +1,9 @@
 import Views.Loginframe;
-
-import javax.swing.SwingUtilities;
+import javafx.application.Application;
 
 public class Main {
 
     public static void main(String[] args) {
-
-        SwingUtilities.invokeLater(() -> {
-
-            Loginframe loginFrame = new Loginframe();
-
-            loginFrame.setVisible(true);
-        });
+        Application.launch(Loginframe.class, args);
     }
 }

@@ -402,7 +402,7 @@ public class DashboardFrame extends JFrame {
 
         if (result == JOptionPane.YES_OPTION) {
 
-            new Loginframe().setVisible(true);
+            Loginframe.open();
 
             dispose();
         }
