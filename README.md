@@ -844,38 +844,52 @@ Then run:
 
 ---
 
-# Project Technology
+# Project Technology & Architecture
 
 ```text
-Language:
-Java 21
-
-GUI:
-JavaFX
-
-UI Markup:
-FXML
-
-Styling:
-JavaFX CSS
-
-Build Tool:
-Maven
-
-Database:
-[Add database here]
-
-AI:
-[Add AI API/service here]
-
-Version Control:
-Git / GitHub
+Language:        Java 21 (LTS)
+GUI Framework:   JavaFX 21 (Pure Java programmatic UI, no FXML)
+Styling:         Modern JavaFX CSS (theme variables, dark/light accents, SVGs)
+Connection Pool: HikariCP
+Database:        PostgreSQL (ACID transactions, pessimistic locking, Row-Level Security)
+Security:        BCrypt (work factor 12), SHA-256 tokens, SecureRandom 32-char alphabet
+Currency:        Philippine Peso (₱)
+Build Tool:      Maven Wrapper (mvnw)
 ```
 
 ---
 
-# bAI
+# Onboarding & Authentication Architecture
 
-**AI Business Assistant**
+bAI uses a multi-tenant business structure designed for retail operations:
 
-A JavaFX desktop business management application with AI-assisted features designed to help businesses manage products, inventory, sales, reports, and business operations.
+### 1. Business Owner Registration
+* Only the **Business Owner** registers publicly via the **"Create a business account"** portal.
+* Automatically creates the store's `organizations` record, the owner user (`OWNER` role, `APPROVED` status), and an immutable audit trail entry in a single atomic database transaction.
+* Owners have access to the full management console (Dashboard, Products, Inventory, Analytics, AI Insights, Reports, and Team).
+
+### 2. Staff Onboarding via 10-Minute Join Codes
+Staff members do **not** register publicly and there are no invite links or approval queues.
+
+1. **Generation (Owner Only)**:
+   * The store owner navigates to the **Team** page and clicks **"Add Team Member"**.
+   * Selects the role: `Store Associate (EMPLOYEE)` or `Inventory Manager (MANAGER)`. A business can never generate another `OWNER`.
+   * An 8-character code is generated from a 32-character unambiguous alphabet (`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, excluding confusing characters `0`, `1`, `I`, `O`).
+   * The code is displayed formatted as `XXXX-XXXX` **ONCE** with a live 10:00 countdown timer, a **Copy Code** button, and a **Cancel Code** button.
+   * **Airtight Security**: The raw code is never stored in the database (only its SHA-256 hash is saved). Once the modal is closed, the raw code can never be retrieved again.
+   * Organizations are capped at a maximum of 5 concurrent active join codes.
+2. **Redemption (Staff Join)**:
+   * Staff click **"Join with a code"** on the login screen.
+   * Enter the 8-character invitation code, full name, work email, and create a password (minimum 8 characters with at least one letter and one number).
+   * **Atomic Transaction**: Evaluates `expires_at > NOW()` inside SQL with pessimistic row locking (`SELECT ... FOR UPDATE`).
+   * On redemption, the staff account is created in `APPROVED` status with the pre-assigned role, the join code is marked used, and an audit log entry is recorded.
+   * Any invalid, expired, used, or cancelled code returns the uniform response: `"Invalid or expired code."`
+   * Join attempts are rate-limited to 5 per minute per device with automated exponential backoff on repeated failures.
+3. **Automated Hygiene**:
+   * Expired join codes older than 1 day are automatically purged during code generation and maintenance jobs.
+
+---
+
+# bAI — AI Business Assistant
+
+AI-Powered Inventory & Retail Management Assistant built for Filipino retail store employees and business owners. Real-time stock tracking, automated par-level alerts, intelligent shift audits, and full-screen kiosk support.

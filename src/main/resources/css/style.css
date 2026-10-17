@@ -1,17 +1,10 @@
 .root {
-    -background: #ffffff;
-    -border: #cbd5e1;
-    -primary: #3b82f6;
-    -primary-hover: #2563eb;
-    -primary-pressed: #1d4ed8;
-    -text: #0f172a;
-    -muted: #64748b;
-    -placeholder: #94a3b8;
-    -error: #dc2626;
-
-    -fx-font-family: "Segoe UI", "Arial";
-    -fx-focus-color: transparent;
-    -fx-faint-focus-color: transparent;
+    -background: -bg-main;
+    -border: -border-subtle;
+    -text: -text-main;
+    -muted: -text-muted;
+    -placeholder: -text-disabled;
+    -error: -status-danger;
 }
 
 .login-pane {

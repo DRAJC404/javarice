@@ -1,3 +1,6 @@
 target/
 *.class
 .env
+src/main/resources/application.properties
+*.token
+.bai/
