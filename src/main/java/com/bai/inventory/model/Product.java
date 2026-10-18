@@ -110,6 +110,10 @@ public class Product {
         }
     }
 
+    public boolean isInStock() {
+        return !isOutOfStock() && !isLowStock();
+    }
+
     public boolean isOutOfStock() {
         return "OUT_OF_STOCK".equalsIgnoreCase(status) || stockQuantity <= 0;
     }

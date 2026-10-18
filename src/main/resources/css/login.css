@@ -57,6 +57,39 @@
     -fx-line-spacing: 3;
 }
 
+.hero-feature-row {
+    -fx-spacing: 14;
+    -fx-alignment: TOP_LEFT;
+}
+
+.hero-check-circle {
+    -fx-min-width: 24px;
+    -fx-max-width: 24px;
+    -fx-min-height: 24px;
+    -fx-max-height: 24px;
+    -fx-background-color: rgba(255, 255, 255, 0.20);
+    -fx-background-radius: 12;
+    -fx-alignment: CENTER;
+}
+
+.hero-check-icon {
+    -fx-fill: white;
+    -fx-scale-x: 0.85;
+    -fx-scale-y: 0.85;
+}
+
+.hero-feature-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+    -fx-text-fill: white;
+}
+
+.hero-feature-desc {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: #93C5FD;
+    -fx-line-spacing: 2px;
+}
+
 .hero-feature-pill {
     -fx-background-color: rgba(255, 255, 255, 0.12);
     -fx-background-radius: 10;
@@ -75,7 +108,7 @@
     -fx-background-color: -bg-surface;
     -fx-alignment: CENTER;
     -fx-padding: 40 56;
-    -fx-pref-width: 480;
+    -fx-pref-width: 520;
     -fx-min-width: 420;
     -fx-max-width: 520;
 }
@@ -84,6 +117,12 @@
     -fx-alignment: CENTER_LEFT;
     -fx-spacing: 10;
     -fx-padding: 0 0 16 0;
+}
+
+.brand-wordmark {
+    -fx-font-size: 24px;
+    -fx-font-weight: 900;
+    -fx-text-fill: -primary;
 }
 
 .brand-tag {
@@ -111,17 +150,17 @@
     -fx-font-size: 13px;
     -fx-font-weight: 700;
     -fx-text-fill: -text-main;
-    -fx-padding: 0 0 6 0;
+    -fx-padding: 0 0 2 0;
 }
 
 .input-box {
     -fx-background-color: white;
-    -fx-background-radius: 10;
+    -fx-background-radius: 8;
     -fx-border-color: -border-color;
     -fx-border-width: 1.5;
-    -fx-border-radius: 10;
-    -fx-pref-height: 44px;
-    -fx-min-height: 44px;
+    -fx-border-radius: 8;
+    -fx-pref-height: 40px;
+    -fx-min-height: 40px;
     -fx-padding: 0 12;
     -fx-alignment: CENTER_LEFT;
     -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.03), 4, 0, 0, 1);
@@ -208,6 +247,65 @@
 
 .btn-auth-submit:pressed {
     -fx-background-color: -primary-pressed;
+}
+
+.text-label {
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #334155;
+}
+
+.form-label-required {
+    -fx-text-fill: -status-danger;
+}
+
+.strength-track {
+    -fx-pref-height: 4px;
+    -fx-min-height: 4px;
+    -fx-max-height: 4px;
+    -fx-background-color: #E2E8F0;
+    -fx-background-radius: 2;
+}
+
+.strength-fill {
+    -fx-pref-height: 4px;
+    -fx-min-height: 4px;
+    -fx-max-height: 4px;
+    -fx-background-radius: 2;
+}
+
+.strength-fill-weak {
+    -fx-background-color: -status-danger;
+}
+
+.strength-fill-good {
+    -fx-background-color: -status-warning;
+}
+
+.strength-fill-strong {
+    -fx-background-color: -status-success;
+}
+
+.strength-status {
+    -fx-font-size: 11.5px;
+    -fx-font-weight: 700;
+}
+
+.strength-weak-text {
+    -fx-text-fill: -status-danger;
+}
+
+.strength-good-text {
+    -fx-text-fill: -status-warning;
+}
+
+.strength-strong-text {
+    -fx-text-fill: -status-success;
+}
+
+.strength-hint {
+    -fx-font-size: 11px;
+    -fx-text-fill: -text-muted;
 }
 
 .btn-auth-submit:disabled {

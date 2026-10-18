@@ -187,7 +187,7 @@ CREATE TABLE stock_movements (
     product_id INT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('IN', 'OUT', 'ADJUSTMENT')),
-    quantity INT NOT NULL CHECK (quantity > 0),
+    quantity INT NOT NULL CHECK (quantity >= 0),
     reason VARCHAR(40) NOT NULL CHECK (reason IN ('SOLD', 'USED', 'DAMAGED', 'EXPIRED', 'RESTOCK', 'AUDIT_CORRECTION', 'OTHER', 'UNDO', 'OPENING_STOCK')),
     previous_stock INT NOT NULL CHECK (previous_stock >= 0),
     new_stock INT NOT NULL CHECK (new_stock >= 0),
@@ -266,6 +266,21 @@ CREATE POLICY tenant_isolation_stock_counts ON stock_counts FOR ALL
 ALTER TABLE ai_insights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_insights FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_ai_insights ON ai_insights FOR ALL
+    USING (organization_id = NULLIF(current_setting('app.current_organization_id', true), '')::INT);
+
+CREATE TABLE IF NOT EXISTS ai_usage_tracking (
+    id SERIAL PRIMARY KEY,
+    organization_id INT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    usage_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    call_count INT NOT NULL DEFAULT 1,
+    last_called_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_ai_usage_org_date UNIQUE (organization_id, usage_date)
+);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_org ON ai_usage_tracking(organization_id);
+
+ALTER TABLE ai_usage_tracking ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_usage_tracking FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_ai_usage_tracking ON ai_usage_tracking FOR ALL
     USING (organization_id = NULLIF(current_setting('app.current_organization_id', true), '')::INT);
 
 ALTER TABLE join_codes FORCE ROW LEVEL SECURITY;

@@ -62,8 +62,8 @@ public class ProductCategoryIsolationTest {
 
     @Test
     @Order(1)
-    @DisplayName("1. A new business with zero categories can add a product with no category (null)")
-    void testNewBusinessWithZeroCategoriesCanAddProductWithNoCategory() throws Exception {
+    @DisplayName("1. ProductService requires category, but database column category_id remains nullable")
+    void testNewBusinessWithZeroCategoriesRequiresCategoryInService() throws Exception {
         AuthService.setCurrentUser(testOwner);
 
         List<Category> cats = productService.getCategories(testOwner);
@@ -73,6 +73,7 @@ public class ProductCategoryIsolationTest {
         p.setOrganizationId(ORG_TEST_ID);
         p.setName("Uncategorized Coffee Cup");
         p.setCategoryId(null);
+        p.setImagePath("/images/cup.png");
         p.setSku("UNCAT-001");
         p.setBarcode("123456789012");
         p.setUnit("pcs");
@@ -81,20 +82,26 @@ public class ProductCategoryIsolationTest {
         p.setStockQuantity(10);
         p.setLowStockThreshold(5);
 
-        Product created = productService.createProduct(p, testOwner);
+        // ProductService must reject null category
+        ProductService.ValidationException ex = assertThrows(
+                ProductService.ValidationException.class,
+                () -> productService.createProduct(p, testOwner),
+                "ProductService should reject product without category"
+        );
+        assertTrue(ex.hasFieldError("category"));
 
-        assertNotNull(created, "Product should be created successfully without category");
-        assertTrue(created.getId() > 0, "Created product should have a positive ID");
-        assertNull(created.getCategoryId(), "Created product category_id must be null");
-
+        // Database level column category_id must be nullable
         try (Connection conn = DatabaseConfig.getConnection(ORG_TEST_ID);
-             PreparedStatement stmt = conn.prepareStatement("SELECT category_id FROM products WHERE id = ? AND organization_id = ?")) {
-            stmt.setInt(1, created.getId());
-            stmt.setInt(2, ORG_TEST_ID);
+             PreparedStatement stmt = conn.prepareStatement(
+                     "INSERT INTO products (organization_id, name, category_id, sku, barcode, unit, cost_price, selling_price, stock_quantity, low_stock_threshold) " +
+                     "VALUES (?, 'DB Null Category Cup', NULL, 'DB-NULL-001', '123456789012', 'pcs', 25, 50, 10, 5) RETURNING id")) {
+            stmt.setInt(1, ORG_TEST_ID);
             try (ResultSet rs = stmt.executeQuery()) {
-                assertTrue(rs.next(), "Product record must exist in DB");
-                assertNull(rs.getObject("category_id"), "DB column category_id must be SQL NULL");
+                assertTrue(rs.next(), "Database must allow null category_id directly");
+                int newId = rs.getInt(1);
+                assertTrue(newId > 0);
             }
+            conn.commit();
         }
     }
 
@@ -112,6 +119,7 @@ public class ProductCategoryIsolationTest {
         p.setOrganizationId(ORG_TEST_ID);
         p.setName("House Signature Blend");
         p.setCategoryId(newCat.getId());
+        p.setImagePath("/images/blend.png");
         p.setSku("HOUSE-001");
         p.setBarcode("987654321098");
         p.setUnit("bag");
@@ -157,10 +165,14 @@ public class ProductCategoryIsolationTest {
         p.setOrganizationId(ORG_TEST_ID);
         p.setName("Foreign Category Product");
         p.setCategoryId(foreignCategoryId);
+        p.setImagePath("/images/foreign.png");
         p.setSku("FOREIGN-001");
+        p.setBarcode("987654321999");
         p.setUnit("pcs");
         p.setCostPrice(new BigDecimal("10.00"));
         p.setSellingPrice(new BigDecimal("20.00"));
+        p.setStockQuantity(5);
+        p.setLowStockThreshold(2);
 
         ProductService.ValidationException ex = assertThrows(
                 ProductService.ValidationException.class,
@@ -168,7 +180,8 @@ public class ProductCategoryIsolationTest {
                 "Should reject foreign category ID with friendly validation message"
         );
 
-        assertEquals("Selected category no longer exists.", ex.getMessage());
+        assertTrue(ex.hasFieldError("category"), "Error must be on category field");
+        assertTrue(ex.getMessage().contains("category"), "Message should mention category");
     }
 
     @Test

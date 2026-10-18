@@ -73,14 +73,38 @@ public class LoginView extends BorderPane implements Disposable {
 
         splitBox.getChildren().addAll(heroPane, formPane);
         setCenter(splitBox);
+
+        widthProperty().addListener((obs, oldW, newW) -> {
+            double w = newW.doubleValue();
+            if (w > 0) {
+                if (w < 900) {
+                    heroPane.setVisible(false);
+                    heroPane.setManaged(false);
+                    HBox.setHgrow(formPane, Priority.ALWAYS);
+                } else {
+                    heroPane.setVisible(true);
+                    heroPane.setManaged(true);
+                    HBox.setHgrow(heroPane, Priority.ALWAYS);
+                    HBox.setHgrow(formPane, Priority.NEVER);
+                }
+            }
+        });
     }
 
     private Node createHeroPane() {
         StackPane heroStack = new StackPane();
         heroStack.getStyleClass().add("hero-stack");
 
-        Region imageLayer = new Region();
-        imageLayer.getStyleClass().add("hero-image-layer");
+        ImageView bgImageView = new ImageView();
+        try (InputStream is = getClass().getResourceAsStream("/images/logo.jpeg")) {
+            if (is != null) {
+                bgImageView.setImage(new Image(is));
+                bgImageView.fitWidthProperty().bind(heroStack.widthProperty());
+                bgImageView.fitHeightProperty().bind(heroStack.heightProperty());
+                bgImageView.setPreserveRatio(false);
+                bgImageView.setOpacity(0.18);
+            }
+        } catch (Exception ignored) {}
 
         Region overlayLayer = new Region();
         overlayLayer.getStyleClass().add("hero-overlay-layer");
@@ -91,75 +115,91 @@ public class LoginView extends BorderPane implements Disposable {
 
         VBox content = new VBox(24);
         content.getStyleClass().add("hero-content");
-        content.setMaxWidth(460);
+        content.setMaxWidth(480);
 
         Label badge = new Label("AI-POWERED INVENTORY ASSISTANT");
         badge.getStyleClass().add("hero-badge");
 
-        Label title = new Label("Smarter Stock Tracking,\nZero Manual Counting");
+        Label title = new Label("Smarter Stock Tracking, Zero Manual Counting");
         title.getStyleClass().add("hero-title");
+        title.setWrapText(true);
 
         Label subtitle = new Label("bAI automates real-time deductions, tracks item velocity, and alerts you before stock runs out.");
         subtitle.getStyleClass().add("hero-subtitle");
         subtitle.setWrapText(true);
 
-        VBox features = new VBox(12);
+        VBox features = new VBox(16);
         features.getChildren().addAll(
-                createFeaturePill("Real-Time Stock Deductions (Sold, Used, Damaged, Expired)"),
-                createFeaturePill("Predictive Restock Alerts & AI Demand Forecast"),
-                createFeaturePill("High-Precision Inventory Audits & Spot Checks")
+                createFeatureItem("Real-Time Stock Deductions", "Automated tracking for sold, used, damaged, and expired goods."),
+                createFeatureItem("Predictive Restock Alerts", "Smart velocity monitoring and AI demand forecasting to prevent stockouts."),
+                createFeatureItem("High-Precision Inventory Audits", "Rapid shift reconciliation and multi-location spot checks.")
         );
 
         content.getChildren().addAll(badge, title, subtitle, features);
         hero.getChildren().add(content);
 
-        heroStack.getChildren().addAll(imageLayer, overlayLayer, hero);
+        heroStack.getChildren().addAll(bgImageView, overlayLayer, hero);
         return heroStack;
     }
 
-    private Node createFeaturePill(String text) {
-        HBox pill = new HBox(12);
-        pill.getStyleClass().add("hero-feature-pill");
-        pill.setAlignment(Pos.CENTER_LEFT);
+    private HBox createFeatureItem(String title, String desc) {
+        HBox row = new HBox(14);
+        row.getStyleClass().add("hero-feature-row");
+        row.setAlignment(Pos.TOP_LEFT);
 
-        SVGPath checkIcon = new SVGPath();
-        checkIcon.setContent(SVG_CHECK);
-        checkIcon.setStyle("-fx-fill: #93C5FD;");
+        StackPane circle = new StackPane();
+        circle.getStyleClass().add("hero-check-circle");
+        SVGPath check = new SVGPath();
+        check.setContent(SVG_CHECK);
+        check.getStyleClass().add("hero-check-icon");
+        circle.getChildren().add(check);
 
-        Label label = new Label(text);
-        label.getStyleClass().add("hero-feature-text");
+        VBox text = new VBox(3);
+        Label t = new Label(title);
+        t.getStyleClass().add("hero-feature-title");
+        Label d = new Label(desc);
+        d.getStyleClass().add("hero-feature-desc");
+        d.setWrapText(true);
+        text.getChildren().addAll(t, d);
 
-        pill.getChildren().addAll(checkIcon, label);
-        return pill;
+        row.getChildren().addAll(circle, text);
+        return row;
     }
 
     private Node createFormPane() {
+        ScrollPane scrollPane = new ScrollPane();
+        scrollPane.getStyleClass().add("auth-form-scroll");
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+
+        VBox formOuter = new VBox();
+        formOuter.getStyleClass().add("auth-pane");
+        formOuter.setAlignment(Pos.CENTER);
+        formOuter.setFillWidth(true);
+
         VBox form = new VBox(18);
-        form.getStyleClass().add("auth-pane");
+        form.setMaxWidth(408);
         form.setAlignment(Pos.CENTER_LEFT);
-        form.setPrefWidth(480);
-        form.setMinWidth(420);
-        form.setMaxWidth(520);
 
         HBox brandRow = new HBox(10);
-        brandRow.getStyleClass().add("brand-row");
         brandRow.setAlignment(Pos.CENTER_LEFT);
 
-        ImageView logoView = new ImageView();
         try (InputStream is = getClass().getResourceAsStream("/images/bailogo.png")) {
             if (is != null) {
-                Image logoImg = new Image(is);
-                logoView.setImage(logoImg);
-                logoView.setFitHeight(38);
+                ImageView logoView = new ImageView(new Image(is));
+                logoView.setFitHeight(40);
                 logoView.setPreserveRatio(true);
                 logoView.setSmooth(true);
+                brandRow.getChildren().add(logoView);
             }
         } catch (Exception ignored) {}
 
-        Label tag = new Label("Inventory Assistant");
-        tag.getStyleClass().add("brand-tag");
+        Label appTitle = new Label("bAI");
+        appTitle.getStyleClass().add("brand-wordmark");
 
-        brandRow.getChildren().addAll(logoView, tag);
+        brandRow.getChildren().add(appTitle);
 
         VBox titleBox = new VBox(4);
         Label title = new Label("Hi, welcome to bAI");
@@ -167,10 +207,11 @@ public class LoginView extends BorderPane implements Disposable {
 
         Label subtitle = new Label("Enter your credentials to access your account");
         subtitle.getStyleClass().add("auth-subtitle");
+        subtitle.setWrapText(true);
         titleBox.getChildren().addAll(title, subtitle);
 
         Label emailLabel = new Label("Email Address");
-        emailLabel.getStyleClass().add("field-label");
+        emailLabel.getStyleClass().add("text-label");
 
         emailField = new TextField();
         emailField.setPromptText("you@example.com");
@@ -178,7 +219,7 @@ public class LoginView extends BorderPane implements Disposable {
         emailField.setOnAction(e -> (visiblePasswordField.isVisible() ? visiblePasswordField : passwordField).requestFocus());
 
         Label passwordLabel = new Label("Password");
-        passwordLabel.getStyleClass().add("field-label");
+        passwordLabel.getStyleClass().add("text-label");
 
         passwordField = new PasswordField();
         passwordField.setPromptText("Enter your password");
@@ -243,6 +284,13 @@ public class LoginView extends BorderPane implements Disposable {
         signInButton.setMaxWidth(Double.MAX_VALUE);
         signInButton.setOnAction(e -> handleLogin());
 
+        Button joinButton = new Button("Join with a code");
+        joinButton.getStyleClass().add("btn-secondary");
+        joinButton.setMaxWidth(Double.MAX_VALUE);
+        joinButton.setOnAction(e -> {
+            if (onNavigateJoin != null) onNavigateJoin.run();
+        });
+
         VBox footerBox = new VBox(6);
         footerBox.getStyleClass().add("auth-footer");
         footerBox.setAlignment(Pos.CENTER);
@@ -258,33 +306,26 @@ public class LoginView extends BorderPane implements Disposable {
         });
         ownerRow.getChildren().addAll(ownerLabel, ownerLink);
 
-        HBox joinRow = new HBox(4);
-        joinRow.setAlignment(Pos.CENTER);
-        Label staffLabel = new Label("Staff member?");
-        staffLabel.getStyleClass().add("auth-footer-text");
-        Hyperlink joinLink = new Hyperlink("Join with a code");
-        joinLink.getStyleClass().add("auth-link");
-        joinLink.setOnAction(e -> {
-            if (onNavigateJoin != null) onNavigateJoin.run();
-        });
-        joinRow.getChildren().addAll(staffLabel, joinLink);
+        footerBox.getChildren().add(ownerRow);
 
-        footerBox.getChildren().addAll(ownerRow, joinRow);
+        VBox emailGroup = new VBox(4, emailLabel, emailField);
+        VBox passwordGroup = new VBox(4, passwordLabel, passwordContainer);
 
         form.getChildren().addAll(
                 brandRow,
                 titleBox,
-                emailLabel,
-                emailField,
-                passwordLabel,
-                passwordContainer,
+                emailGroup,
+                passwordGroup,
                 rememberMeBox,
                 errorLabel,
                 signInButton,
+                joinButton,
                 footerBox
         );
 
-        return form;
+        formOuter.getChildren().add(form);
+        scrollPane.setContent(formOuter);
+        return scrollPane;
     }
 
     private void handleLogin() {

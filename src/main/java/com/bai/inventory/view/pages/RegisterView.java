@@ -36,10 +36,10 @@ public class RegisterView extends BorderPane implements Disposable {
     private ProgressIndicator loadingIndicator;
     private Label errorLabel;
 
-    private Region seg1;
-    private Region seg2;
-    private Region seg3;
-    private Label strengthLabel;
+    private StackPane strengthTrack;
+    private Region strengthFill;
+    private Label strengthStatusLabel;
+    private Label strengthHintLabel;
 
     private Runnable onNavigateLogin;
 
@@ -66,14 +66,38 @@ public class RegisterView extends BorderPane implements Disposable {
 
         splitBox.getChildren().addAll(heroPane, formPane);
         setCenter(splitBox);
+
+        widthProperty().addListener((obs, oldW, newW) -> {
+            double w = newW.doubleValue();
+            if (w > 0) {
+                if (w < 900) {
+                    heroPane.setVisible(false);
+                    heroPane.setManaged(false);
+                    HBox.setHgrow(formPane, Priority.ALWAYS);
+                } else {
+                    heroPane.setVisible(true);
+                    heroPane.setManaged(true);
+                    HBox.setHgrow(heroPane, Priority.ALWAYS);
+                    HBox.setHgrow(formPane, Priority.NEVER);
+                }
+            }
+        });
     }
 
     private Node createHeroPane() {
         StackPane heroStack = new StackPane();
         heroStack.getStyleClass().add("hero-stack");
 
-        Region imageLayer = new Region();
-        imageLayer.getStyleClass().add("hero-image-layer");
+        ImageView bgImageView = new ImageView();
+        try (InputStream is = getClass().getResourceAsStream("/images/logo.jpeg")) {
+            if (is != null) {
+                bgImageView.setImage(new Image(is));
+                bgImageView.fitWidthProperty().bind(heroStack.widthProperty());
+                bgImageView.fitHeightProperty().bind(heroStack.heightProperty());
+                bgImageView.setPreserveRatio(false);
+                bgImageView.setOpacity(0.18);
+            }
+        } catch (Exception ignored) {}
 
         Region overlayLayer = new Region();
         overlayLayer.getStyleClass().add("hero-overlay-layer");
@@ -84,19 +108,20 @@ public class RegisterView extends BorderPane implements Disposable {
 
         VBox content = new VBox(24);
         content.getStyleClass().add("hero-content");
-        content.setMaxWidth(460);
+        content.setMaxWidth(480);
 
         Label badge = new Label("BUSINESS OWNER PORTAL");
         badge.getStyleClass().add("hero-badge");
 
         Label title = new Label("Register Your Retail Business on bAI");
         title.getStyleClass().add("hero-title");
+        title.setWrapText(true);
 
         Label subtitle = new Label("Set up your retail organization, manage stock and catalog in Philippine Pesos (₱), and invite staff securely using 10-minute join codes.");
         subtitle.getStyleClass().add("hero-subtitle");
         subtitle.setWrapText(true);
 
-        VBox features = new VBox(12);
+        VBox features = new VBox(16);
         features.getChildren().addAll(
                 createFeatureItem("Multi-Tenant Store Management", "Complete ownership of store catalog, categories, pricing, and par levels."),
                 createFeatureItem("10-Minute Staff Join Codes", "Add employees and managers with short-lived secure codes. No invite links or approval queues."),
@@ -105,20 +130,24 @@ public class RegisterView extends BorderPane implements Disposable {
 
         content.getChildren().addAll(badge, title, subtitle, features);
         hero.getChildren().add(content);
-        heroStack.getChildren().addAll(imageLayer, overlayLayer, hero);
+        heroStack.getChildren().addAll(bgImageView, overlayLayer, hero);
 
         return heroStack;
     }
 
     private HBox createFeatureItem(String title, String desc) {
-        HBox row = new HBox(12);
+        HBox row = new HBox(14);
+        row.getStyleClass().add("hero-feature-row");
         row.setAlignment(Pos.TOP_LEFT);
 
+        StackPane circle = new StackPane();
+        circle.getStyleClass().add("hero-check-circle");
         SVGPath check = new SVGPath();
         check.setContent(SVG_CHECK);
-        check.getStyleClass().add("hero-feature-icon");
+        check.getStyleClass().add("hero-check-icon");
+        circle.getChildren().add(check);
 
-        VBox text = new VBox(2);
+        VBox text = new VBox(3);
         Label t = new Label(title);
         t.getStyleClass().add("hero-feature-title");
         Label d = new Label(desc);
@@ -126,7 +155,7 @@ public class RegisterView extends BorderPane implements Disposable {
         d.setWrapText(true);
         text.getChildren().addAll(t, d);
 
-        row.getChildren().addAll(check, text);
+        row.getChildren().addAll(circle, text);
         return row;
     }
 
@@ -134,16 +163,18 @@ public class RegisterView extends BorderPane implements Disposable {
         ScrollPane scrollPane = new ScrollPane();
         scrollPane.getStyleClass().add("auth-form-scroll");
         scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 
         VBox formOuter = new VBox();
-        formOuter.getStyleClass().add("form-pane");
+        formOuter.getStyleClass().add("auth-pane");
         formOuter.setAlignment(Pos.CENTER);
+        formOuter.setFillWidth(true);
 
         VBox formContent = new VBox(14);
-        formContent.getStyleClass().add("form-card");
-        formContent.setMaxWidth(440);
+        formContent.setMaxWidth(408);
+        formContent.setAlignment(Pos.CENTER_LEFT);
 
         HBox brandRow = new HBox(10);
         brandRow.setAlignment(Pos.CENTER_LEFT);
@@ -151,19 +182,16 @@ public class RegisterView extends BorderPane implements Disposable {
         try (InputStream is = getClass().getResourceAsStream("/images/bailogo.png")) {
             if (is != null) {
                 ImageView logoImg = new ImageView(new Image(is));
-                logoImg.setFitHeight(34);
+                logoImg.setFitHeight(40);
                 logoImg.setPreserveRatio(true);
                 brandRow.getChildren().add(logoImg);
             }
         } catch (Exception ignored) {}
 
         Label appTitle = new Label("bAI");
-        appTitle.setStyle("-fx-font-size: 22px; -fx-font-weight: 900; -fx-text-fill: -primary;");
+        appTitle.getStyleClass().add("brand-wordmark");
 
-        Label badge = new Label("OWNER SETUP");
-        badge.getStyleClass().add("brand-tag");
-
-        brandRow.getChildren().addAll(appTitle, badge);
+        brandRow.getChildren().add(appTitle);
 
         VBox titleBox = new VBox(4);
         Label headerTitle = new Label("Create Business Account");
@@ -174,29 +202,25 @@ public class RegisterView extends BorderPane implements Disposable {
         headerSubtitle.setWrapText(true);
         titleBox.getChildren().addAll(headerTitle, headerSubtitle);
 
-        Label businessLabel = new Label("Business / Store Name *");
-        businessLabel.getStyleClass().add("field-label");
+        HBox businessLabel = createFieldLabel("Business / Store Name", true);
 
         businessNameField = new TextField();
         businessNameField.setPromptText("e.g. Metro Retail Hub");
         businessNameField.getStyleClass().add("input-box");
 
-        Label nameLabel = new Label("Owner Full Name *");
-        nameLabel.getStyleClass().add("field-label");
+        HBox nameLabel = createFieldLabel("Owner Full Name", true);
 
         nameField = new TextField();
         nameField.setPromptText("e.g. Juan Dela Cruz");
         nameField.getStyleClass().add("input-box");
 
-        Label emailLabel = new Label("Work Email Address *");
-        emailLabel.getStyleClass().add("field-label");
+        HBox emailLabel = createFieldLabel("Work Email Address", true);
 
         emailField = new TextField();
         emailField.setPromptText("owner@store.com");
         emailField.getStyleClass().add("input-box");
 
-        Label passLabel = new Label("Password (min. 8 characters, letters & numbers) *");
-        passLabel.getStyleClass().add("field-label");
+        HBox passLabel = createFieldLabel("Password (min. 8 characters, letters & numbers)", true);
 
         StackPane passWrapper = new StackPane();
         passwordField = new PasswordField();
@@ -220,8 +244,7 @@ public class RegisterView extends BorderPane implements Disposable {
 
         Node strengthIndicator = createStrengthIndicator();
 
-        Label confirmLabel = new Label("Confirm Password *");
-        confirmLabel.getStyleClass().add("field-label");
+        HBox confirmLabel = createFieldLabel("Confirm Password", true);
 
         StackPane confirmWrapper = new StackPane();
         confirmPasswordField = new PasswordField();
@@ -245,9 +268,9 @@ public class RegisterView extends BorderPane implements Disposable {
         HBox termsRow = new HBox(4);
         termsRow.setAlignment(Pos.CENTER_LEFT);
         Label termsPrefix = new Label("By registering, you agree to the");
-        termsPrefix.setStyle("-fx-font-size: 11.5px; -fx-text-fill: -text-muted;");
+        termsPrefix.getStyleClass().add("auth-footer-text");
         Hyperlink termsLink = new Hyperlink("Terms of Service");
-        termsLink.setStyle("-fx-font-size: 11.5px; -fx-padding: 0;");
+        termsLink.getStyleClass().add("auth-link");
         termsLink.setOnAction(e -> {
             ViewNavigator.showOverlayDialog(
                     "Terms of Service & Privacy Policy",
@@ -306,15 +329,20 @@ public class RegisterView extends BorderPane implements Disposable {
 
         footerBox.getChildren().addAll(loginRow, joinRow);
 
+        VBox businessGroup = new VBox(4, businessLabel, businessNameField);
+        VBox nameGroup = new VBox(4, nameLabel, nameField);
+        VBox emailGroup = new VBox(4, emailLabel, emailField);
+        VBox passGroup = new VBox(4, passLabel, passWrapper, strengthIndicator);
+        VBox confirmGroup = new VBox(4, confirmLabel, confirmWrapper);
+
         formContent.getChildren().addAll(
                 brandRow,
                 titleBox,
-                businessLabel, businessNameField,
-                nameLabel, nameField,
-                emailLabel, emailField,
-                passLabel, passWrapper,
-                strengthIndicator,
-                confirmLabel, confirmWrapper,
+                businessGroup,
+                nameGroup,
+                emailGroup,
+                passGroup,
+                confirmGroup,
                 termsRow,
                 errorLabel,
                 submitStack,
@@ -324,6 +352,20 @@ public class RegisterView extends BorderPane implements Disposable {
         formOuter.getChildren().add(formContent);
         scrollPane.setContent(formOuter);
         return scrollPane;
+    }
+
+    private HBox createFieldLabel(String text, boolean required) {
+        HBox row = new HBox(2);
+        row.setAlignment(Pos.CENTER_LEFT);
+        Label lbl = new Label(text);
+        lbl.getStyleClass().add("text-label");
+        row.getChildren().add(lbl);
+        if (required) {
+            Label star = new Label(" *");
+            star.getStyleClass().addAll("text-label", "form-label-required");
+            row.getChildren().add(star);
+        }
+        return row;
     }
 
     private Button createEyeButton(PasswordField pf, TextField tf) {
@@ -358,44 +400,42 @@ public class RegisterView extends BorderPane implements Disposable {
     }
 
     private Node createStrengthIndicator() {
-        VBox box = new VBox(4);
-        HBox bars = new HBox(4);
+        VBox box = new VBox(6);
 
-        seg1 = new Region();
-        seg2 = new Region();
-        seg3 = new Region();
+        strengthTrack = new StackPane();
+        strengthTrack.getStyleClass().add("strength-track");
+        strengthTrack.setAlignment(Pos.CENTER_LEFT);
 
-        HBox.setHgrow(seg1, Priority.ALWAYS);
-        HBox.setHgrow(seg2, Priority.ALWAYS);
-        HBox.setHgrow(seg3, Priority.ALWAYS);
+        strengthFill = new Region();
+        strengthFill.getStyleClass().add("strength-fill");
+        strengthFill.setPrefWidth(0);
+        strengthTrack.getChildren().add(strengthFill);
 
-        seg1.setPrefHeight(4);
-        seg2.setPrefHeight(4);
-        seg3.setPrefHeight(4);
+        HBox labelRow = new HBox(8);
+        labelRow.setAlignment(Pos.CENTER_LEFT);
 
-        resetSegmentStyles();
+        strengthStatusLabel = new Label("");
+        strengthStatusLabel.getStyleClass().add("strength-status");
 
-        bars.getChildren().addAll(seg1, seg2, seg3);
+        strengthHintLabel = new Label("Min. 8 characters with letters & numbers");
+        strengthHintLabel.getStyleClass().add("strength-hint");
+        strengthHintLabel.setWrapText(false);
 
-        strengthLabel = new Label("Password must contain at least 8 characters, a letter and a number.");
-        strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: -text-muted;");
-
-        box.getChildren().addAll(bars, strengthLabel);
+        labelRow.getChildren().addAll(strengthStatusLabel, strengthHintLabel);
+        box.getChildren().addAll(strengthTrack, labelRow);
         return box;
     }
 
-    private void resetSegmentStyles() {
-        String base = "-fx-background-color: #E2E8F0; -fx-background-radius: 2;";
-        seg1.setStyle(base);
-        seg2.setStyle(base);
-        seg3.setStyle(base);
-    }
-
     private void updatePasswordStrength(String password) {
+        if (strengthFill == null || strengthTrack == null) return;
+        strengthFill.prefWidthProperty().unbind();
+
         if (password == null || password.isEmpty()) {
-            resetSegmentStyles();
-            strengthLabel.setText("Password must contain at least 8 characters, a letter and a number.");
-            strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: -text-muted;");
+            strengthFill.setPrefWidth(0);
+            strengthFill.getStyleClass().removeAll("strength-fill-weak", "strength-fill-good", "strength-fill-strong");
+            strengthStatusLabel.setText("");
+            strengthStatusLabel.getStyleClass().removeAll("strength-weak-text", "strength-good-text", "strength-strong-text");
+            strengthHintLabel.setText("Min. 8 characters with letters & numbers");
             return;
         }
 
@@ -409,39 +449,37 @@ public class RegisterView extends BorderPane implements Disposable {
         if (hasLetter && hasNumber) score++;
         if (score == 2 && (password.length() >= 12 || hasSpecial)) score++;
 
-        String bgInactive = "-fx-background-color: #E2E8F0; -fx-background-radius: 2;";
-        String bgWeak = "-fx-background-color: #EF4444; -fx-background-radius: 2;";
-        String bgFair = "-fx-background-color: #F59E0B; -fx-background-radius: 2;";
-        String bgStrong = "-fx-background-color: #10B981; -fx-background-radius: 2;";
+        strengthFill.getStyleClass().removeAll("strength-fill-weak", "strength-fill-good", "strength-fill-strong");
+        strengthStatusLabel.getStyleClass().removeAll("strength-weak-text", "strength-good-text", "strength-strong-text");
 
         switch (score) {
             case 1 -> {
-                seg1.setStyle(bgWeak);
-                seg2.setStyle(bgInactive);
-                seg3.setStyle(bgInactive);
-                strengthLabel.setText("Weak - Must have at least 8 characters, letter and number.");
-                strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #EF4444; -fx-font-weight: 700;");
+                strengthFill.prefWidthProperty().bind(strengthTrack.widthProperty().multiply(0.33));
+                strengthFill.getStyleClass().add("strength-fill-weak");
+                strengthStatusLabel.setText("Weak");
+                strengthStatusLabel.getStyleClass().add("strength-weak-text");
+                strengthHintLabel.setText("Must have at least 8 characters, letter and number.");
             }
             case 2 -> {
-                seg1.setStyle(bgFair);
-                seg2.setStyle(bgFair);
-                seg3.setStyle(bgInactive);
-                strengthLabel.setText("Good - Add special characters or more length for Strong.");
-                strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #F59E0B; -fx-font-weight: 700;");
+                strengthFill.prefWidthProperty().bind(strengthTrack.widthProperty().multiply(0.66));
+                strengthFill.getStyleClass().add("strength-fill-good");
+                strengthStatusLabel.setText("Good");
+                strengthStatusLabel.getStyleClass().add("strength-good-text");
+                strengthHintLabel.setText("Add special characters or more length for Strong.");
             }
             case 3 -> {
-                seg1.setStyle(bgStrong);
-                seg2.setStyle(bgStrong);
-                seg3.setStyle(bgStrong);
-                strengthLabel.setText("Strong password.");
-                strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #10B981; -fx-font-weight: 700;");
+                strengthFill.prefWidthProperty().bind(strengthTrack.widthProperty());
+                strengthFill.getStyleClass().add("strength-fill-strong");
+                strengthStatusLabel.setText("Strong");
+                strengthStatusLabel.getStyleClass().add("strength-strong-text");
+                strengthHintLabel.setText("Strong password.");
             }
             default -> {
-                seg1.setStyle(bgWeak);
-                seg2.setStyle(bgInactive);
-                seg3.setStyle(bgInactive);
-                strengthLabel.setText("Too short.");
-                strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #EF4444;");
+                strengthFill.prefWidthProperty().bind(strengthTrack.widthProperty().multiply(0.20));
+                strengthFill.getStyleClass().add("strength-fill-weak");
+                strengthStatusLabel.setText("Weak");
+                strengthStatusLabel.getStyleClass().add("strength-weak-text");
+                strengthHintLabel.setText("Too short.");
             }
         }
     }
@@ -488,10 +526,10 @@ public class RegisterView extends BorderPane implements Disposable {
                 Platform.runLater(() -> {
                     setLoading(false);
                     ViewNavigator.showOverlayDialog(
-                            "Business Registered Successfully!",
-                            "Your business account (" + email + ") is now ready with role OWNER.\n\n"
-                                    + "You have full administrator privileges to configure inventory and invite staff using 10-minute join codes.",
+                            "Business Registered Successfully",
+                            "Your business account (" + email + ") is ready. You have full access to manage products and inventory, and you can add your team with 10-minute join codes.",
                             ViewNavigator.OverlayType.SUCCESS,
+                            "Continue to sign in",
                             () -> {
                                 if (onNavigateLogin != null) {
                                     onNavigateLogin.run();

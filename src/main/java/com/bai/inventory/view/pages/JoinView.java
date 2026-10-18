@@ -37,10 +37,10 @@ public class JoinView extends BorderPane implements Disposable {
     private ProgressIndicator loadingIndicator;
     private Label errorLabel;
 
-    private Region seg1;
-    private Region seg2;
-    private Region seg3;
-    private Label strengthLabel;
+    private StackPane strengthTrack;
+    private Region strengthFill;
+    private Label strengthStatusLabel;
+    private Label strengthHintLabel;
 
     private Runnable onNavigateLogin;
 
@@ -67,14 +67,38 @@ public class JoinView extends BorderPane implements Disposable {
 
         splitBox.getChildren().addAll(heroPane, formPane);
         setCenter(splitBox);
+
+        widthProperty().addListener((obs, oldW, newW) -> {
+            double w = newW.doubleValue();
+            if (w > 0) {
+                if (w < 900) {
+                    heroPane.setVisible(false);
+                    heroPane.setManaged(false);
+                    HBox.setHgrow(formPane, Priority.ALWAYS);
+                } else {
+                    heroPane.setVisible(true);
+                    heroPane.setManaged(true);
+                    HBox.setHgrow(heroPane, Priority.ALWAYS);
+                    HBox.setHgrow(formPane, Priority.NEVER);
+                }
+            }
+        });
     }
 
     private Node createHeroPane() {
         StackPane heroStack = new StackPane();
         heroStack.getStyleClass().add("hero-stack");
 
-        Region imageLayer = new Region();
-        imageLayer.getStyleClass().add("hero-image-layer");
+        ImageView bgImageView = new ImageView();
+        try (InputStream is = getClass().getResourceAsStream("/images/logo.jpeg")) {
+            if (is != null) {
+                bgImageView.setImage(new Image(is));
+                bgImageView.fitWidthProperty().bind(heroStack.widthProperty());
+                bgImageView.fitHeightProperty().bind(heroStack.heightProperty());
+                bgImageView.setPreserveRatio(false);
+                bgImageView.setOpacity(0.18);
+            }
+        } catch (Exception ignored) {}
 
         Region overlayLayer = new Region();
         overlayLayer.getStyleClass().add("hero-overlay-layer");
@@ -85,19 +109,20 @@ public class JoinView extends BorderPane implements Disposable {
 
         VBox content = new VBox(24);
         content.getStyleClass().add("hero-content");
-        content.setMaxWidth(460);
+        content.setMaxWidth(480);
 
         Label badge = new Label("STAFF ONBOARDING");
         badge.getStyleClass().add("hero-badge");
 
         Label title = new Label("Join Your Store Team with an Invite Code");
         title.getStyleClass().add("hero-title");
+        title.setWrapText(true);
 
         Label subtitle = new Label("Your store owner generated a secure 10-minute join code. Enter the 8-character code below along with your name, email, and password to activate your access.");
         subtitle.getStyleClass().add("hero-subtitle");
         subtitle.setWrapText(true);
 
-        VBox features = new VBox(12);
+        VBox features = new VBox(16);
         features.getChildren().addAll(
                 createFeatureItem("Direct Team Access", "Instantly linked to your organization with role pre-configured by your manager or store owner."),
                 createFeatureItem("10-Minute Code Expiry", "Join codes expire in 10 minutes for airtight security. One code, single redemption."),
@@ -106,20 +131,24 @@ public class JoinView extends BorderPane implements Disposable {
 
         content.getChildren().addAll(badge, title, subtitle, features);
         hero.getChildren().add(content);
-        heroStack.getChildren().addAll(imageLayer, overlayLayer, hero);
+        heroStack.getChildren().addAll(bgImageView, overlayLayer, hero);
 
         return heroStack;
     }
 
     private HBox createFeatureItem(String title, String desc) {
-        HBox row = new HBox(12);
+        HBox row = new HBox(14);
+        row.getStyleClass().add("hero-feature-row");
         row.setAlignment(Pos.TOP_LEFT);
 
+        StackPane circle = new StackPane();
+        circle.getStyleClass().add("hero-check-circle");
         SVGPath check = new SVGPath();
         check.setContent(SVG_CHECK);
-        check.getStyleClass().add("hero-feature-icon");
+        check.getStyleClass().add("hero-check-icon");
+        circle.getChildren().add(check);
 
-        VBox text = new VBox(2);
+        VBox text = new VBox(3);
         Label t = new Label(title);
         t.getStyleClass().add("hero-feature-title");
         Label d = new Label(desc);
@@ -127,7 +156,7 @@ public class JoinView extends BorderPane implements Disposable {
         d.setWrapText(true);
         text.getChildren().addAll(t, d);
 
-        row.getChildren().addAll(check, text);
+        row.getChildren().addAll(circle, text);
         return row;
     }
 
@@ -135,16 +164,18 @@ public class JoinView extends BorderPane implements Disposable {
         ScrollPane scrollPane = new ScrollPane();
         scrollPane.getStyleClass().add("auth-form-scroll");
         scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 
         VBox container = new VBox();
-        container.getStyleClass().add("form-pane");
+        container.getStyleClass().add("auth-pane");
         container.setAlignment(Pos.CENTER);
+        container.setFillWidth(true);
 
         VBox form = new VBox(14);
-        form.getStyleClass().add("form-card");
-        form.setMaxWidth(440);
+        form.setMaxWidth(408);
+        form.setAlignment(Pos.CENTER_LEFT);
 
         HBox brandRow = new HBox(10);
         brandRow.setAlignment(Pos.CENTER_LEFT);
@@ -152,59 +183,54 @@ public class JoinView extends BorderPane implements Disposable {
         try (InputStream is = getClass().getResourceAsStream("/images/bailogo.png")) {
             if (is != null) {
                 ImageView logoImg = new ImageView(new Image(is));
-                logoImg.setFitHeight(34);
+                logoImg.setFitHeight(40);
                 logoImg.setPreserveRatio(true);
                 brandRow.getChildren().add(logoImg);
             }
         } catch (Exception ignored) {}
 
         Label brandLabel = new Label("bAI");
-        brandLabel.getStyleClass().add("form-brand-name");
-        Label editionLabel = new Label("STAFF JOIN");
-        editionLabel.getStyleClass().add("form-brand-tag");
-        brandRow.getChildren().addAll(brandLabel, editionLabel);
+        brandLabel.getStyleClass().add("brand-wordmark");
+        brandRow.getChildren().add(brandLabel);
 
         VBox titleBox = new VBox(4);
         Label title = new Label("Join Organization");
-        title.getStyleClass().add("form-title");
+        title.getStyleClass().add("auth-title");
 
         Label subtitle = new Label("Enter your 8-character invitation code to join");
-        subtitle.getStyleClass().add("form-subtitle");
+        subtitle.getStyleClass().add("auth-subtitle");
+        subtitle.setWrapText(true);
         titleBox.getChildren().addAll(title, subtitle);
 
-        Label codeLabel = new Label("Invitation Code *");
-        codeLabel.getStyleClass().add("form-field-label");
+        HBox codeLabel = createFieldLabel("Invitation Code", true);
 
         codeField = new TextField();
         codeField.setPromptText("e.g. 7K9P-X2M4");
-        codeField.getStyleClass().add("auth-input");
+        codeField.getStyleClass().add("input-box");
         codeField.setStyle("-fx-font-family: monospace; -fx-font-size: 15px; -fx-font-weight: 700; -fx-letter-spacing: 1px;");
 
-        Label nameLabel = new Label("Full Name *");
-        nameLabel.getStyleClass().add("form-field-label");
+        HBox nameLabel = createFieldLabel("Full Name", true);
 
         nameField = new TextField();
         nameField.setPromptText("Maria Santos");
-        nameField.getStyleClass().add("auth-input");
+        nameField.getStyleClass().add("input-box");
 
-        Label emailLabel = new Label("Work Email Address *");
-        emailLabel.getStyleClass().add("form-field-label");
+        HBox emailLabel = createFieldLabel("Work Email Address", true);
 
         emailField = new TextField();
         emailField.setPromptText("maria@example.com");
-        emailField.getStyleClass().add("auth-input");
+        emailField.getStyleClass().add("input-box");
 
-        Label passwordLabel = new Label("Create Password *");
-        passwordLabel.getStyleClass().add("form-field-label");
+        HBox passwordLabel = createFieldLabel("Create Password", true);
 
         StackPane passwordContainer = new StackPane();
         passwordField = new PasswordField();
         passwordField.setPromptText("At least 8 characters");
-        passwordField.getStyleClass().add("auth-input");
+        passwordField.getStyleClass().add("input-box");
 
         visiblePasswordField = new TextField();
         visiblePasswordField.setPromptText("At least 8 characters");
-        visiblePasswordField.getStyleClass().add("auth-input");
+        visiblePasswordField.getStyleClass().add("input-box");
         visiblePasswordField.setVisible(false);
         visiblePasswordField.setManaged(false);
 
@@ -218,17 +244,16 @@ public class JoinView extends BorderPane implements Disposable {
         Node strengthBar = createStrengthIndicator();
         passwordField.textProperty().addListener((obs, oldVal, newVal) -> updateStrengthIndicator(newVal));
 
-        Label confirmPasswordLabel = new Label("Confirm Password *");
-        confirmPasswordLabel.getStyleClass().add("form-field-label");
+        HBox confirmPasswordLabel = createFieldLabel("Confirm Password", true);
 
         StackPane confirmPasswordContainer = new StackPane();
         confirmPasswordField = new PasswordField();
         confirmPasswordField.setPromptText("Re-type your password");
-        confirmPasswordField.getStyleClass().add("auth-input");
+        confirmPasswordField.getStyleClass().add("input-box");
 
         visibleConfirmPasswordField = new TextField();
         visibleConfirmPasswordField.setPromptText("Re-type your password");
-        visibleConfirmPasswordField.getStyleClass().add("auth-input");
+        visibleConfirmPasswordField.getStyleClass().add("input-box");
         visibleConfirmPasswordField.setVisible(false);
         visibleConfirmPasswordField.setManaged(false);
 
@@ -240,7 +265,7 @@ public class JoinView extends BorderPane implements Disposable {
         confirmPasswordContainer.getChildren().addAll(confirmPasswordField, visibleConfirmPasswordField, toggleConfirmBtn);
 
         errorLabel = new Label();
-        errorLabel.getStyleClass().add("auth-error-message");
+        errorLabel.getStyleClass().add("auth-error");
         errorLabel.setWrapText(true);
         errorLabel.setVisible(false);
 
@@ -269,20 +294,20 @@ public class JoinView extends BorderPane implements Disposable {
 
         loginRow.getChildren().addAll(alreadyAccount, loginLink);
 
+        VBox codeGroup = new VBox(4, codeLabel, codeField);
+        VBox nameGroup = new VBox(4, nameLabel, nameField);
+        VBox emailGroup = new VBox(4, emailLabel, emailField);
+        VBox passwordGroup = new VBox(4, passwordLabel, passwordContainer, strengthBar);
+        VBox confirmPasswordGroup = new VBox(4, confirmPasswordLabel, confirmPasswordContainer);
+
         form.getChildren().addAll(
                 brandRow,
                 titleBox,
-                codeLabel,
-                codeField,
-                nameLabel,
-                nameField,
-                emailLabel,
-                emailField,
-                passwordLabel,
-                passwordContainer,
-                strengthBar,
-                confirmPasswordLabel,
-                confirmPasswordContainer,
+                codeGroup,
+                nameGroup,
+                emailGroup,
+                passwordGroup,
+                confirmPasswordGroup,
                 errorLabel,
                 joinButton,
                 loginRow
@@ -293,45 +318,57 @@ public class JoinView extends BorderPane implements Disposable {
         return scrollPane;
     }
 
+    private HBox createFieldLabel(String text, boolean required) {
+        HBox row = new HBox(2);
+        row.setAlignment(Pos.CENTER_LEFT);
+        Label lbl = new Label(text);
+        lbl.getStyleClass().add("text-label");
+        row.getChildren().add(lbl);
+        if (required) {
+            Label star = new Label(" *");
+            star.getStyleClass().addAll("text-label", "form-label-required");
+            row.getChildren().add(star);
+        }
+        return row;
+    }
+
     private Node createStrengthIndicator() {
-        VBox box = new VBox(4);
+        VBox box = new VBox(6);
 
-        HBox bars = new HBox(4);
-        seg1 = new Region();
-        seg2 = new Region();
-        seg3 = new Region();
+        strengthTrack = new StackPane();
+        strengthTrack.getStyleClass().add("strength-track");
+        strengthTrack.setAlignment(Pos.CENTER_LEFT);
 
-        HBox.setHgrow(seg1, Priority.ALWAYS);
-        HBox.setHgrow(seg2, Priority.ALWAYS);
-        HBox.setHgrow(seg3, Priority.ALWAYS);
+        strengthFill = new Region();
+        strengthFill.getStyleClass().add("strength-fill");
+        strengthFill.setPrefWidth(0);
+        strengthTrack.getChildren().add(strengthFill);
 
-        seg1.setPrefHeight(4);
-        seg2.setPrefHeight(4);
-        seg3.setPrefHeight(4);
+        HBox labelRow = new HBox(8);
+        labelRow.setAlignment(Pos.CENTER_LEFT);
 
-        resetSegmentStyles();
+        strengthStatusLabel = new Label("");
+        strengthStatusLabel.getStyleClass().add("strength-status");
 
-        bars.getChildren().addAll(seg1, seg2, seg3);
+        strengthHintLabel = new Label("Min. 8 characters with letters & numbers");
+        strengthHintLabel.getStyleClass().add("strength-hint");
+        strengthHintLabel.setWrapText(false);
 
-        strengthLabel = new Label("Must be min 8 chars with letters & numbers");
-        strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: -text-muted;");
-
-        box.getChildren().addAll(bars, strengthLabel);
+        labelRow.getChildren().addAll(strengthStatusLabel, strengthHintLabel);
+        box.getChildren().addAll(strengthTrack, labelRow);
         return box;
     }
 
-    private void resetSegmentStyles() {
-        String base = "-fx-background-color: #E2E8F0; -fx-background-radius: 2;";
-        seg1.setStyle(base);
-        seg2.setStyle(base);
-        seg3.setStyle(base);
-    }
-
     private void updateStrengthIndicator(String password) {
+        if (strengthFill == null || strengthTrack == null) return;
+        strengthFill.prefWidthProperty().unbind();
+
         if (password == null || password.isEmpty()) {
-            resetSegmentStyles();
-            strengthLabel.setText("Must be min 8 chars with letters & numbers");
-            strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: -text-muted;");
+            strengthFill.setPrefWidth(0);
+            strengthFill.getStyleClass().removeAll("strength-fill-weak", "strength-fill-good", "strength-fill-strong");
+            strengthStatusLabel.setText("");
+            strengthStatusLabel.getStyleClass().removeAll("strength-weak-text", "strength-good-text", "strength-strong-text");
+            strengthHintLabel.setText("Min. 8 characters with letters & numbers");
             return;
         }
 
@@ -345,39 +382,37 @@ public class JoinView extends BorderPane implements Disposable {
         if (hasLetter && hasNumber) score++;
         if (score == 2 && (password.length() >= 12 || hasSpecial)) score++;
 
-        String bgInactive = "-fx-background-color: #E2E8F0; -fx-background-radius: 2;";
-        String bgWeak = "-fx-background-color: #EF4444; -fx-background-radius: 2;";
-        String bgFair = "-fx-background-color: #F59E0B; -fx-background-radius: 2;";
-        String bgStrong = "-fx-background-color: #10B981; -fx-background-radius: 2;";
+        strengthFill.getStyleClass().removeAll("strength-fill-weak", "strength-fill-good", "strength-fill-strong");
+        strengthStatusLabel.getStyleClass().removeAll("strength-weak-text", "strength-good-text", "strength-strong-text");
 
         switch (score) {
             case 1 -> {
-                seg1.setStyle(bgWeak);
-                seg2.setStyle(bgInactive);
-                seg3.setStyle(bgInactive);
-                strengthLabel.setText("Weak (needs letter and number, 8+ chars)");
-                strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #EF4444; -fx-font-weight: 600;");
+                strengthFill.prefWidthProperty().bind(strengthTrack.widthProperty().multiply(0.33));
+                strengthFill.getStyleClass().add("strength-fill-weak");
+                strengthStatusLabel.setText("Weak");
+                strengthStatusLabel.getStyleClass().add("strength-weak-text");
+                strengthHintLabel.setText("Must have at least 8 characters, letter and number.");
             }
             case 2 -> {
-                seg1.setStyle(bgFair);
-                seg2.setStyle(bgFair);
-                seg3.setStyle(bgInactive);
-                strengthLabel.setText("Fair (add symbols or length for stronger password)");
-                strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #F59E0B; -fx-font-weight: 600;");
+                strengthFill.prefWidthProperty().bind(strengthTrack.widthProperty().multiply(0.66));
+                strengthFill.getStyleClass().add("strength-fill-good");
+                strengthStatusLabel.setText("Good");
+                strengthStatusLabel.getStyleClass().add("strength-good-text");
+                strengthHintLabel.setText("Add special characters or more length for Strong.");
             }
             case 3 -> {
-                seg1.setStyle(bgStrong);
-                seg2.setStyle(bgStrong);
-                seg3.setStyle(bgStrong);
-                strengthLabel.setText("Strong password");
-                strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #10B981; -fx-font-weight: 700;");
+                strengthFill.prefWidthProperty().bind(strengthTrack.widthProperty());
+                strengthFill.getStyleClass().add("strength-fill-strong");
+                strengthStatusLabel.setText("Strong");
+                strengthStatusLabel.getStyleClass().add("strength-strong-text");
+                strengthHintLabel.setText("Strong password.");
             }
             default -> {
-                seg1.setStyle(bgWeak);
-                seg2.setStyle(bgInactive);
-                seg3.setStyle(bgInactive);
-                strengthLabel.setText("Too weak");
-                strengthLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #EF4444;");
+                strengthFill.prefWidthProperty().bind(strengthTrack.widthProperty().multiply(0.20));
+                strengthFill.getStyleClass().add("strength-fill-weak");
+                strengthStatusLabel.setText("Weak");
+                strengthStatusLabel.getStyleClass().add("strength-weak-text");
+                strengthHintLabel.setText("Too short.");
             }
         }
     }

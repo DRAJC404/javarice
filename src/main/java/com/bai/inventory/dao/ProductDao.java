@@ -71,6 +71,10 @@ public class ProductDao {
         return findAll(searchQuery, categoryId, resolveOrganizationId(0), false);
     }
 
+    public List<Product> findAll(int organizationId) {
+        return findAll(null, null, organizationId, false);
+    }
+
     public List<Product> findAll(String searchQuery, Integer categoryId, int organizationId) {
         return findAll(searchQuery, categoryId, organizationId, false);
     }
@@ -300,18 +304,16 @@ public class ProductDao {
                     }
                 }
 
-                if (product.getStockQuantity() > 0) {
-                    try (PreparedStatement movStmt = conn.prepareStatement(insertMovementSql)) {
-                        String ref = "SM-OPEN-" + System.currentTimeMillis() + "-" + created.getId();
-                        movStmt.setInt(1, organizationId);
-                        movStmt.setString(2, ref);
-                        movStmt.setInt(3, created.getId());
-                        movStmt.setInt(4, userId);
-                        movStmt.setInt(5, product.getStockQuantity());
-                        movStmt.setInt(6, product.getStockQuantity());
-                        movStmt.setString(7, "Initial opening stock recorded at product creation");
-                        movStmt.executeUpdate();
-                    }
+                try (PreparedStatement movStmt = conn.prepareStatement(insertMovementSql)) {
+                    String ref = "SM-OPEN-" + System.currentTimeMillis() + "-" + created.getId();
+                    movStmt.setInt(1, organizationId);
+                    movStmt.setString(2, ref);
+                    movStmt.setInt(3, created.getId());
+                    movStmt.setInt(4, userId);
+                    movStmt.setInt(5, product.getStockQuantity());
+                    movStmt.setInt(6, product.getStockQuantity());
+                    movStmt.setString(7, "Initial opening stock recorded at product creation");
+                    movStmt.executeUpdate();
                 }
 
                 conn.commit();
@@ -429,6 +431,52 @@ public class ProductDao {
         Timestamp uat = rs.getTimestamp("updated_at");
         if (uat != null) p.setUpdatedAt(uat.toLocalDateTime());
         return p;
+    }
+
+    public boolean isSkuTaken(String sku, Integer excludeProductId, int organizationId) {
+        if (sku == null || sku.trim().isEmpty()) return false;
+        String sql = "SELECT 1 FROM products WHERE organization_id = ? AND LOWER(sku) = LOWER(?) AND (? IS NULL OR id != ?)";
+        try (Connection conn = DatabaseConfig.getConnection(organizationId);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, organizationId);
+            stmt.setString(2, sku.trim());
+            if (excludeProductId != null) {
+                stmt.setInt(3, excludeProductId);
+                stmt.setInt(4, excludeProductId);
+            } else {
+                stmt.setNull(3, java.sql.Types.INTEGER);
+                stmt.setNull(4, java.sql.Types.INTEGER);
+            }
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            System.err.println("[ProductDao] Error checking SKU uniqueness: " + e.getMessage());
+        }
+        return false;
+    }
+
+    public boolean isBarcodeTaken(String barcode, Integer excludeProductId, int organizationId) {
+        if (barcode == null || barcode.trim().isEmpty()) return false;
+        String sql = "SELECT 1 FROM products WHERE organization_id = ? AND barcode = ? AND (? IS NULL OR id != ?)";
+        try (Connection conn = DatabaseConfig.getConnection(organizationId);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, organizationId);
+            stmt.setString(2, barcode.trim());
+            if (excludeProductId != null) {
+                stmt.setInt(3, excludeProductId);
+                stmt.setInt(4, excludeProductId);
+            } else {
+                stmt.setNull(3, java.sql.Types.INTEGER);
+                stmt.setNull(4, java.sql.Types.INTEGER);
+            }
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            System.err.println("[ProductDao] Error checking barcode uniqueness: " + e.getMessage());
+        }
+        return false;
     }
 
     private List<Product> getDemoProducts(String searchQuery, Integer categoryId) {

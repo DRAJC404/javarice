@@ -890,6 +890,93 @@ Staff members do **not** register publicly and there are no invite links or appr
 
 ---
 
-# bAI — AI Business Assistant
+# AI Configuration & Security Architecture
 
-AI-Powered Inventory & Retail Management Assistant built for Filipino retail store employees and business owners. Real-time stock tracking, automated par-level alerts, intelligent shift audits, and full-screen kiosk support.
+bAI integrates AI-driven analytics, restocking recommendations, and the **Ask bAI** inventory copilot.
+
+### 1. Environment Configuration (`.env`)
+To configure AI services locally, copy `.env.example` to `.env` in the working directory:
+```bash
+cp .env.example .env
+```
+Populate the environment variables:
+```properties
+# AI Configuration (.env)
+AI_API_KEY=your_gemini_or_groq_api_key_here
+AI_MODEL=gemini-1.5-flash
+AI_BASE_URL=
+```
+* **Resolution Order**: `EnvConfig` reads real system environment variables first (`System.getenv`), then falls back to `.env` in the working directory.
+* **Safe Diagnostics**: The application never displays or logs the raw API key. All diagnostic outputs and logs mask keys (e.g., `gsk_...****` or `[NOT CONFIGURED]`).
+* **Rule-Based Fallback**: If `AI_API_KEY` is omitted, bAI smoothly falls back to an offline rule-based heuristic engine with a small `"AI model not configured"` notice.
+
+### 2. Architecture & Production Notice
+> [!WARNING]
+> **DEMO ONLY NOTICE**: Shipping an AI API key inside a client-side desktop application binary or `.env` file is strictly intended for local development and offline demonstrations. In a commercial or production environment, desktop clients must **never** hold raw LLM provider API credentials. All AI requests must be routed through an authenticated backend API service that securely holds credentials, enforces per-tenant quotas, and performs server-side prompt validation.
+
+### 3. Tenant Privacy & Aggregation Safeguards
+* **Zero PII**: Only aggregated, anonymous inventory totals (e.g., product counts, total units deducted, velocity numbers) for the authenticated tenant are transmitted to the LLM. No user names, emails, customer records, or internal database IDs are ever sent.
+* **Tenant Isolation**: "Ask bAI" and analytics queries are strictly scoped to the authenticated organization's verified session via PostgreSQL Row-Level Security (`app.current_organization_id`).
+* **Rate Limits & Caching**: LLM calls are limited to 20 calls per organization per day (tracked in `ai_usage_tracking`), and cached in `ai_insights` with a 1-hour expiration window.
+* **7-Day History Guard**: Stores with fewer than 7 days of movement records automatically skip LLM calls and display rule-based insights.
+
+---
+
+# Database Migration & Schema Updates
+
+If upgrading an existing bAI database installation, execute the following SQL migration statements:
+
+```sql
+-- 1. Relax stock_movements quantity constraint to support zero-quantity edge cases (e.g., initial 0-count opening stock)
+ALTER TABLE stock_movements DROP CONSTRAINT IF EXISTS stock_movements_quantity_check;
+ALTER TABLE stock_movements ADD CONSTRAINT stock_movements_quantity_check CHECK (quantity >= 0);
+
+-- 2. Add AI usage tracking table for daily organization quotas (20 requests/day)
+CREATE TABLE IF NOT EXISTS ai_usage_tracking (
+    id SERIAL PRIMARY KEY,
+    organization_id INT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    usage_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    call_count INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (organization_id, usage_date)
+);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_org_date ON ai_usage_tracking(organization_id, usage_date);
+
+ALTER TABLE ai_usage_tracking ENABLE ROW LEVEL SECURITY;
+CREATE POLICY ai_usage_org_isolation ON ai_usage_tracking
+    FOR ALL
+    USING (organization_id = NULLIF(current_setting('app.current_organization_id', true), '')::integer)
+    WITH CHECK (organization_id = NULLIF(current_setting('app.current_organization_id', true), '')::integer);
+```
+
+---
+
+# Page 8: Reports & Export Engine
+
+The **Reports** view (`ReportsView.java`, `ReportService.java`, `ReportDao.java`) delivers enterprise reporting with multi-format export capabilities:
+
+### Report Types
+1. **Stock Movement Report**: Complete audit trail of stock in, stock out, damage deductions, and adjustments with reference numbers and user attribution. Filterable by date range (Today, 7 Days, 30 Days, 90 Days, All Time).
+2. **Inventory Valuation Report**: Live inventory breakdown with units on hand, unit cost, selling price, and calculated total inventory valuation.
+3. **Product Catalog Report**: Master list of all registered catalog items with SKUs, barcodes, categories, and active/archived status.
+4. **Low Stock Report**: Prioritized list of items currently at or below their reorder threshold (`stock_quantity <= low_stock_threshold`), ordered by stock deficit.
+
+### Export & Printing
+* **CSV Export**: Clean RFC 4180-compliant CSV generation with escaped quotes and commas, downloadable to any user-selected path.
+* **OpenPDF Landscape Export**: Formatted A4 landscape PDF document with corporate headers, zebra-striped data tables, column fitting, and timestamped internal confidentiality notices.
+* **Native Printing**: Off-thread JavaFX `PrinterJob` integration with page orientation and scaling checks.
+* **Role-Based Financial Privacy**: For staff with `EMPLOYEE` role, cost price and inventory cost valuations are automatically masked to `₱0.00` across all views and exported files.
+
+---
+
+# Page 9: AI Insights & Forecasting
+
+The **AI Insights** view (`AIInsightsView.java`) combines heuristic statistical algorithms with optional LLM reasoning:
+
+### Features & Capabilities
+1. **Executive KPI Cards**: Real-time display of Store Health Score, Restock Priorities count, Anomaly Alert count, and Daily AI API Quota remaining (out of 20).
+2. **Actual vs. Projected Demand**: Dual-series JavaFX LineChart charting past 7-day movement velocity against predictive next 7-day demand projections with strict integer axis ticks.
+3. **Restock Suggestions & Anomaly Badges**: Prioritized reorder list showing runout estimations, suggested order units, and supplier cost estimates. Anomaly detection flags unusual stock deductions or velocity spikes.
+4. **Ask bAI Copilot**: Real-time natural language query interface for inventory questions with interactive quick-prompt chips ("Which items are low on stock?", "What is our best-selling item?", "Show reorder suggestions") and a 200-character input safety guard.
+5. **Airtight Tenant & Privacy Scoping**: All questions are answered strictly within the verified organization context with zero cross-tenant visibility.

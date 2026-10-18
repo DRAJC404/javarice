@@ -265,6 +265,20 @@ public class UserDao {
         }
     }
 
+    public int countStaffMembers(int organizationId) {
+        String sql = "SELECT COUNT(*) FROM users WHERE organization_id = ? AND role_id IN (2, 3) AND is_active = true";
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, organizationId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            System.err.println("[UserDao] Error counting staff: " + e.getMessage());
+        }
+        return 0;
+    }
+
     public List<User> findByOrganization(int organizationId) {
         List<User> list = new ArrayList<>();
         String sql = "SELECT id, organization_id, role_id, full_name, email, password_hash, approval_status, remember_token_hash, remember_expires_at, is_active " +

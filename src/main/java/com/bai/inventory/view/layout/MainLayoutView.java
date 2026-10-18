@@ -6,10 +6,12 @@ import com.bai.inventory.service.AuthService;
 import com.bai.inventory.view.Disposable;
 import com.bai.inventory.view.navigation.ViewNavigator;
 import com.bai.inventory.view.navigation.ViewType;
+import com.bai.inventory.view.pages.AnalyticsView;
 import com.bai.inventory.view.pages.DashboardView;
 import com.bai.inventory.view.pages.InventoryView;
 import com.bai.inventory.view.pages.ProductCatalogView;
 import com.bai.inventory.view.pages.TeamView;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -38,6 +40,7 @@ public class MainLayoutView extends StackPane implements Disposable {
     private static final String SVG_REPORTS   = "M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z";
     private static final String SVG_USERS     = "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z";
     private static final String SVG_LOGOUT    = "M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z";
+    private static final String SVG_PLUS      = "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z";
 
     private final BorderPane mainBorderPane;
     private final BorderPane contentArea;
@@ -52,6 +55,9 @@ public class MainLayoutView extends StackPane implements Disposable {
     private Label tagBadge;
     private Node userDetailsBox;
     private Label logoutTextLabel;
+    private Button addTeamNavBtn;
+    private Label teamBadgeLabel;
+    private final com.bai.inventory.dao.JoinCodeDao joinCodeDao = new com.bai.inventory.dao.JoinCodeDao();
 
     private final Map<ViewType, Button> navButtons = new LinkedHashMap<>();
     private final Map<ViewType, Label> navLabels = new LinkedHashMap<>();
@@ -115,6 +121,7 @@ public class MainLayoutView extends StackPane implements Disposable {
         });
 
         selectView(initialView != null ? initialView : ViewType.DASHBOARD);
+        refreshTeamBadge();
     }
 
     private Node buildTopNavbar() {
@@ -137,11 +144,28 @@ public class MainLayoutView extends StackPane implements Disposable {
         navbar.setLeft(leftSection);
 
         User currentUser = AuthService.getCurrentUser();
+        HBox rightSection = new HBox(12);
+        rightSection.setAlignment(Pos.CENTER_RIGHT);
+
+        if (currentUser != null && currentUser.getRole() == Role.OWNER) {
+            addTeamNavBtn = new Button("Add team member");
+            addTeamNavBtn.getStyleClass().add("btn-primary");
+            SVGPath plusIcon = new SVGPath();
+            plusIcon.setContent(SVG_PLUS);
+            plusIcon.getStyleClass().add("sidebar-item-icon");
+            addTeamNavBtn.setGraphic(plusIcon);
+            addTeamNavBtn.setOnAction(e -> com.bai.inventory.view.dialog.JoinCodeDialogHelper.showAddTeamMemberModal(this::refreshTeamBadge));
+            rightSection.getChildren().add(addTeamNavBtn);
+        }
+
         Node userMenu = buildUserTopMenu(currentUser);
-        navbar.setRight(userMenu);
+        rightSection.getChildren().add(userMenu);
+        navbar.setRight(rightSection);
 
         return navbar;
     }
+
+    private Button sidebarLogoutBtn;
 
     private Node buildUserTopMenu(User user) {
         HBox userBox = new HBox(12);
@@ -163,16 +187,7 @@ public class MainLayoutView extends StackPane implements Disposable {
         roleLabel.getStyleClass().add("top-navbar-user-role");
         metaBox.getChildren().addAll(nameLabel, roleLabel);
 
-        Button logoutBtn = new Button("Log out");
-        logoutBtn.getStyleClass().add("sidebar-logout-btn");
-        logoutBtn.setOnAction(e -> ViewNavigator.showConfirmDialog(
-                "Sign Out",
-                "Are you sure you want to log out of the management console?",
-                "Sign Out",
-                ViewNavigator::logout
-        ));
-
-        userBox.getChildren().addAll(avatar, metaBox, logoutBtn);
+        userBox.getChildren().addAll(avatar, metaBox);
         return userBox;
     }
 
@@ -185,13 +200,13 @@ public class MainLayoutView extends StackPane implements Disposable {
         VBox brandBox = new VBox(8);
         brandBox.getStyleClass().add("sidebar-brand-box");
 
-        HBox logoRow = new HBox(8);
+        HBox logoRow = new HBox(10);
         logoRow.setAlignment(Pos.CENTER_LEFT);
 
         try (InputStream is = getClass().getResourceAsStream("/images/bailogo.png")) {
             if (is != null) {
                 ImageView logoImg = new ImageView(new Image(is));
-                logoImg.setFitHeight(30);
+                logoImg.setFitHeight(36);
                 logoImg.setPreserveRatio(true);
                 logoRow.getChildren().add(logoImg);
             }
@@ -200,7 +215,7 @@ public class MainLayoutView extends StackPane implements Disposable {
         brandTitle = new Label("bAI");
         brandTitle.getStyleClass().add("sidebar-logo");
 
-        tagBadge = new Label("INVENTORY");
+        tagBadge = new Label("Inventory");
         tagBadge.getStyleClass().add("sidebar-logo-tag");
 
         logoRow.getChildren().addAll(brandTitle, tagBadge);
@@ -215,13 +230,18 @@ public class MainLayoutView extends StackPane implements Disposable {
         addNavItem(navContainer, ViewType.DASHBOARD, "Dashboard", SVG_DASHBOARD);
         addNavItem(navContainer, ViewType.PRODUCT, "Products", SVG_PRODUCTS);
         addNavItem(navContainer, ViewType.INVENTORY, "Inventory", SVG_INVENTORY);
+
+        if (isOwner) {
+            teamBadgeLabel = new Label();
+            teamBadgeLabel.getStyleClass().add("join-code-badge");
+            teamBadgeLabel.setVisible(false);
+            teamBadgeLabel.setManaged(false);
+            addNavItem(navContainer, ViewType.USERS, "Team", SVG_USERS, teamBadgeLabel);
+        }
+
         addNavItem(navContainer, ViewType.ANALYTICS, "Analytics", SVG_ANALYTICS);
         addNavItem(navContainer, ViewType.AI_INSIGHTS, "AI Insights", SVG_INSIGHTS);
         addNavItem(navContainer, ViewType.REPORT, "Reports", SVG_REPORTS);
-
-        if (isOwner) {
-            addNavItem(navContainer, ViewType.USERS, "Team", SVG_USERS);
-        }
 
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
@@ -233,24 +253,38 @@ public class MainLayoutView extends StackPane implements Disposable {
     }
 
     private void addNavItem(VBox container, ViewType type, String labelText, String svgPath) {
+        addNavItem(container, type, labelText, svgPath, null);
+    }
+
+    private void addNavItem(VBox container, ViewType type, String labelText, String svgPath, Node badge) {
         Button btn = new Button();
         btn.getStyleClass().add("sidebar-item");
         btn.setMaxWidth(Double.MAX_VALUE);
         btn.setAlignment(Pos.CENTER_LEFT);
 
-        HBox row = new HBox(14);
+        HBox row = new HBox(12);
         row.setAlignment(Pos.CENTER_LEFT);
+
+        StackPane iconBox = new StackPane();
+        iconBox.getStyleClass().add("sidebar-icon-box");
 
         SVGPath icon = new SVGPath();
         icon.setContent(svgPath);
         icon.getStyleClass().add("sidebar-item-icon");
-        icon.setScaleX(1.1);
-        icon.setScaleY(1.1);
+
+        iconBox.getChildren().add(icon);
 
         Label label = new Label(labelText);
         label.getStyleClass().add("sidebar-item-label");
 
-        row.getChildren().addAll(icon, label);
+        row.getChildren().addAll(iconBox, label);
+
+        if (badge != null) {
+            Region rowSpacer = new Region();
+            HBox.setHgrow(rowSpacer, Priority.ALWAYS);
+            row.getChildren().addAll(rowSpacer, badge);
+        }
+
         btn.setGraphic(row);
 
         btn.setOnAction(e -> {
@@ -294,6 +328,7 @@ public class MainLayoutView extends StackPane implements Disposable {
         Button logoutBtn = new Button();
         logoutBtn.getStyleClass().add("sidebar-logout-btn");
         logoutBtn.setMaxWidth(Double.MAX_VALUE);
+        this.sidebarLogoutBtn = logoutBtn;
 
         HBox logoutContent = new HBox(8);
         logoutContent.setAlignment(Pos.CENTER);
@@ -308,9 +343,9 @@ public class MainLayoutView extends StackPane implements Disposable {
         logoutContent.getChildren().addAll(logoutIcon, logoutTextLabel);
         logoutBtn.setGraphic(logoutContent);
         logoutBtn.setOnAction(e -> ViewNavigator.showConfirmDialog(
-                "Sign Out",
-                "Are you sure you want to log out of the management console?",
-                "Sign Out",
+                "Sign out?",
+                "You will need to sign in again to continue.",
+                "Sign out",
                 ViewNavigator::logout
         ));
 
@@ -332,6 +367,16 @@ public class MainLayoutView extends StackPane implements Disposable {
     }
 
     private void handleResponsiveLayout(double width) {
+        if (addTeamNavBtn != null) {
+            if (width < 800) {
+                addTeamNavBtn.setText("");
+                addTeamNavBtn.setTooltip(new Tooltip("Add team member"));
+            } else {
+                addTeamNavBtn.setText("Add team member");
+                addTeamNavBtn.setTooltip(null);
+            }
+        }
+
         if (width < 1180) {
             isNarrowMode = true;
             if (mainBorderPane.getLeft() == sidebarBox) {
@@ -389,8 +434,14 @@ public class MainLayoutView extends StackPane implements Disposable {
             navLabels.values().forEach(lbl -> { lbl.setVisible(true); lbl.setManaged(true); });
             if (userDetailsBox != null) { userDetailsBox.setVisible(true); userDetailsBox.setManaged(true); }
             if (logoutTextLabel != null) { logoutTextLabel.setVisible(true); logoutTextLabel.setManaged(true); }
+            if (teamBadgeLabel != null) {
+                boolean show = teamBadgeLabel.getText() != null && !teamBadgeLabel.getText().isEmpty();
+                teamBadgeLabel.setVisible(show);
+                teamBadgeLabel.setManaged(show);
+            }
 
             navButtons.forEach((type, btn) -> btn.setTooltip(null));
+            if (sidebarLogoutBtn != null) sidebarLogoutBtn.setTooltip(null);
         } else {
             sidebarBox.setPrefWidth(72);
             sidebarBox.setMinWidth(72);
@@ -404,6 +455,10 @@ public class MainLayoutView extends StackPane implements Disposable {
             navLabels.values().forEach(lbl -> { lbl.setVisible(false); lbl.setManaged(false); });
             if (userDetailsBox != null) { userDetailsBox.setVisible(false); userDetailsBox.setManaged(false); }
             if (logoutTextLabel != null) { logoutTextLabel.setVisible(false); logoutTextLabel.setManaged(false); }
+            if (teamBadgeLabel != null) {
+                teamBadgeLabel.setVisible(false);
+                teamBadgeLabel.setManaged(false);
+            }
 
             navButtons.forEach((type, btn) -> {
                 Label label = navLabels.get(type);
@@ -411,7 +466,29 @@ public class MainLayoutView extends StackPane implements Disposable {
                     btn.setTooltip(new Tooltip(label.getText()));
                 }
             });
+            if (sidebarLogoutBtn != null) sidebarLogoutBtn.setTooltip(new Tooltip("Sign Out"));
         }
+    }
+
+    public void refreshTeamBadge() {
+        User currentUser = AuthService.getCurrentUser();
+        if (currentUser == null || currentUser.getRole() != Role.OWNER || teamBadgeLabel == null) return;
+        int orgId = currentUser.getOrganizationId() > 0 ? currentUser.getOrganizationId() : 1;
+        com.bai.inventory.util.AppExecutor.execute(() -> {
+            int active = joinCodeDao.countActiveCodes(orgId);
+            Platform.runLater(() -> {
+                if (active > 0) {
+                    teamBadgeLabel.setText(active + " active");
+                    boolean show = !sidebarBox.getStyleClass().contains("sidebar-collapsed");
+                    teamBadgeLabel.setVisible(show);
+                    teamBadgeLabel.setManaged(show);
+                } else {
+                    teamBadgeLabel.setText("");
+                    teamBadgeLabel.setVisible(false);
+                    teamBadgeLabel.setManaged(false);
+                }
+            });
+        });
     }
 
     public void selectView(ViewType type) {
@@ -469,21 +546,9 @@ public class MainLayoutView extends StackPane implements Disposable {
             case DASHBOARD -> new DashboardView();
             case PRODUCT -> new ProductCatalogView();
             case INVENTORY -> new InventoryView();
-            case ANALYTICS -> createSectionPlaceholder(
-                    "Stock Analytics & Turnover",
-                    "Turnover rates, stockout frequency, shrinkage analysis, and deduction histories.",
-                    SVG_ANALYTICS
-            );
-            case AI_INSIGHTS -> createSectionPlaceholder(
-                    "bAI Smart Insights & Forecasts",
-                    "AI predictive restocking recommendations, demand forecasting, and anomaly detection.",
-                    SVG_INSIGHTS
-            );
-            case REPORT -> createSectionPlaceholder(
-                    "Inventory Reports & Export",
-                    "Generate and export comprehensive OpenPDF valuation and movement summaries.",
-                    SVG_REPORTS
-            );
+            case ANALYTICS -> new AnalyticsView();
+            case AI_INSIGHTS -> new com.bai.inventory.view.pages.AIInsightsView();
+            case REPORT -> new com.bai.inventory.view.pages.ReportsView();
             case USERS -> new TeamView();
             default -> new DashboardView();
         };
