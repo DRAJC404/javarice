@@ -271,13 +271,14 @@ public class LoginView extends BorderPane implements Disposable {
 
         footerBox.getChildren().addAll(ownerRow, joinRow);
 
+        VBox emailGroup = new VBox(4, emailLabel, emailField);
+        VBox passwordGroup = new VBox(4, passwordLabel, passwordContainer);
+
         form.getChildren().addAll(
                 brandRow,
                 titleBox,
-                emailLabel,
-                emailField,
-                passwordLabel,
-                passwordContainer,
+                emailGroup,
+                passwordGroup,
                 rememberMeBox,
                 errorLabel,
                 signInButton,

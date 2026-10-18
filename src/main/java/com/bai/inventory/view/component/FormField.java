@@ -20,7 +20,7 @@ public class FormField extends VBox {
     }
 
     public FormField(String labelText, Node inputControl, boolean required, String helperText) {
-        super(5);
+        super(4);
         getStyleClass().add("form-field");
 
         this.inputControl = inputControl;

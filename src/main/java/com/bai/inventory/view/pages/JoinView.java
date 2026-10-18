@@ -269,20 +269,20 @@ public class JoinView extends BorderPane implements Disposable {
 
         loginRow.getChildren().addAll(alreadyAccount, loginLink);
 
+        VBox codeGroup = new VBox(4, codeLabel, codeField);
+        VBox nameGroup = new VBox(4, nameLabel, nameField);
+        VBox emailGroup = new VBox(4, emailLabel, emailField);
+        VBox passwordGroup = new VBox(4, passwordLabel, passwordContainer, strengthBar);
+        VBox confirmPasswordGroup = new VBox(4, confirmPasswordLabel, confirmPasswordContainer);
+
         form.getChildren().addAll(
                 brandRow,
                 titleBox,
-                codeLabel,
-                codeField,
-                nameLabel,
-                nameField,
-                emailLabel,
-                emailField,
-                passwordLabel,
-                passwordContainer,
-                strengthBar,
-                confirmPasswordLabel,
-                confirmPasswordContainer,
+                codeGroup,
+                nameGroup,
+                emailGroup,
+                passwordGroup,
+                confirmPasswordGroup,
                 errorLabel,
                 joinButton,
                 loginRow

@@ -111,17 +111,17 @@
     -fx-font-size: 13px;
     -fx-font-weight: 700;
     -fx-text-fill: -text-main;
-    -fx-padding: 0 0 6 0;
+    -fx-padding: 0 0 2 0;
 }
 
 .input-box {
     -fx-background-color: white;
-    -fx-background-radius: 10;
+    -fx-background-radius: 8;
     -fx-border-color: -border-color;
     -fx-border-width: 1.5;
-    -fx-border-radius: 10;
-    -fx-pref-height: 44px;
-    -fx-min-height: 44px;
+    -fx-border-radius: 8;
+    -fx-pref-height: 40px;
+    -fx-min-height: 40px;
     -fx-padding: 0 12;
     -fx-alignment: CENTER_LEFT;
     -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.03), 4, 0, 0, 1);

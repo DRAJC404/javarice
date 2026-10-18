@@ -66,7 +66,7 @@ public class CategorySelector extends VBox {
     }
 
     public CategorySelector(Mode mode) {
-        super(6);
+        super(4);
         this.mode = mode;
         this.productService = new ProductService();
         this.currentUser = AuthService.getCurrentUser();

@@ -6,6 +6,7 @@ import com.bai.inventory.service.AuthService;
 import com.bai.inventory.view.Disposable;
 import com.bai.inventory.view.navigation.ViewNavigator;
 import com.bai.inventory.view.navigation.ViewType;
+import com.bai.inventory.view.pages.AnalyticsView;
 import com.bai.inventory.view.pages.DashboardView;
 import com.bai.inventory.view.pages.InventoryView;
 import com.bai.inventory.view.pages.ProductCatalogView;
@@ -469,11 +470,7 @@ public class MainLayoutView extends StackPane implements Disposable {
             case DASHBOARD -> new DashboardView();
             case PRODUCT -> new ProductCatalogView();
             case INVENTORY -> new InventoryView();
-            case ANALYTICS -> createSectionPlaceholder(
-                    "Stock Analytics & Turnover",
-                    "Turnover rates, stockout frequency, shrinkage analysis, and deduction histories.",
-                    SVG_ANALYTICS
-            );
+            case ANALYTICS -> new AnalyticsView();
             case AI_INSIGHTS -> createSectionPlaceholder(
                     "bAI Smart Insights & Forecasts",
                     "AI predictive restocking recommendations, demand forecasting, and anomaly detection.",

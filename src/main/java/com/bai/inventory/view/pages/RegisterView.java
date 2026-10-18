@@ -306,15 +306,20 @@ public class RegisterView extends BorderPane implements Disposable {
 
         footerBox.getChildren().addAll(loginRow, joinRow);
 
+        VBox businessGroup = new VBox(4, businessLabel, businessNameField);
+        VBox nameGroup = new VBox(4, nameLabel, nameField);
+        VBox emailGroup = new VBox(4, emailLabel, emailField);
+        VBox passGroup = new VBox(4, passLabel, passWrapper, strengthIndicator);
+        VBox confirmGroup = new VBox(4, confirmLabel, confirmWrapper);
+
         formContent.getChildren().addAll(
                 brandRow,
                 titleBox,
-                businessLabel, businessNameField,
-                nameLabel, nameField,
-                emailLabel, emailField,
-                passLabel, passWrapper,
-                strengthIndicator,
-                confirmLabel, confirmWrapper,
+                businessGroup,
+                nameGroup,
+                emailGroup,
+                passGroup,
+                confirmGroup,
                 termsRow,
                 errorLabel,
                 submitStack,
