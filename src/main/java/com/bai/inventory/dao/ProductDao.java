@@ -71,6 +71,10 @@ public class ProductDao {
         return findAll(searchQuery, categoryId, resolveOrganizationId(0), false);
     }
 
+    public List<Product> findAll(int organizationId) {
+        return findAll(null, null, organizationId, false);
+    }
+
     public List<Product> findAll(String searchQuery, Integer categoryId, int organizationId) {
         return findAll(searchQuery, categoryId, organizationId, false);
     }

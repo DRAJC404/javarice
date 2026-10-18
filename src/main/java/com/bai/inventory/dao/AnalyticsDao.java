@@ -26,12 +26,26 @@ public class AnalyticsDao {
     ) {}
 
     public record AnalyticsKpiSummary(
+            KpiComparison totalDeductions,
+            KpiComparison unitsDeducted,
+            KpiComparison activeProducts,
+            KpiComparison avgDailyDeduction,
             KpiComparison inflow,
             KpiComparison outflow,
             KpiComparison netMovement,
             KpiComparison turnoverValue,
             KpiComparison shrinkageRate
-    ) {}
+    ) {
+        public AnalyticsKpiSummary(
+                KpiComparison inflow,
+                KpiComparison outflow,
+                KpiComparison netMovement,
+                KpiComparison turnoverValue,
+                KpiComparison shrinkageRate
+        ) {
+            this(outflow, outflow, outflow, outflow, inflow, outflow, netMovement, turnoverValue, shrinkageRate);
+        }
+    }
 
     public record DailyMovementTrend(
             String dateLabel,
@@ -93,8 +107,10 @@ public class AnalyticsDao {
         String sql =
                 "WITH cur_period AS (" +
                 "    SELECT " +
-                "        COALESCE(SUM(CASE WHEN sm.movement_type = 'IN' THEN sm.quantity ELSE 0 END), 0) AS in_qty, " +
+                "        COUNT(CASE WHEN sm.movement_type = 'OUT' THEN 1 END) AS out_tx, " +
                 "        COALESCE(SUM(CASE WHEN sm.movement_type = 'OUT' THEN sm.quantity ELSE 0 END), 0) AS out_qty, " +
+                "        COALESCE(SUM(CASE WHEN sm.movement_type = 'IN' THEN sm.quantity ELSE 0 END), 0) AS in_qty, " +
+                "        COUNT(DISTINCT CASE WHEN sm.movement_type = 'OUT' THEN sm.product_id END) AS active_prods, " +
                 "        COALESCE(SUM(CASE WHEN sm.movement_type = 'OUT' AND sm.reason IN ('DAMAGED', 'EXPIRED') THEN sm.quantity ELSE 0 END), 0) AS shrink_qty, " +
                 "        COALESCE(SUM(CASE WHEN sm.movement_type = 'OUT' THEN sm.quantity * p.selling_price ELSE 0 END), 0.00) AS turn_val " +
                 "    FROM stock_movements sm " +
@@ -103,8 +119,10 @@ public class AnalyticsDao {
                 "), " +
                 "prev_period AS (" +
                 "    SELECT " +
-                "        COALESCE(SUM(CASE WHEN sm.movement_type = 'IN' THEN sm.quantity ELSE 0 END), 0) AS in_qty, " +
+                "        COUNT(CASE WHEN sm.movement_type = 'OUT' THEN 1 END) AS out_tx, " +
                 "        COALESCE(SUM(CASE WHEN sm.movement_type = 'OUT' THEN sm.quantity ELSE 0 END), 0) AS out_qty, " +
+                "        COALESCE(SUM(CASE WHEN sm.movement_type = 'IN' THEN sm.quantity ELSE 0 END), 0) AS in_qty, " +
+                "        COUNT(DISTINCT CASE WHEN sm.movement_type = 'OUT' THEN sm.product_id END) AS active_prods, " +
                 "        COALESCE(SUM(CASE WHEN sm.movement_type = 'OUT' AND sm.reason IN ('DAMAGED', 'EXPIRED') THEN sm.quantity ELSE 0 END), 0) AS shrink_qty, " +
                 "        COALESCE(SUM(CASE WHEN sm.movement_type = 'OUT' THEN sm.quantity * p.selling_price ELSE 0 END), 0.00) AS turn_val " +
                 "    FROM stock_movements sm " +
@@ -113,8 +131,10 @@ public class AnalyticsDao {
                 "      AND sm.created_at >= (CURRENT_TIMESTAMP - ((2 * ?) || ' days')::interval) " +
                 "      AND sm.created_at < (CURRENT_TIMESTAMP - (? || ' days')::interval)" +
                 ") " +
-                "SELECT c.in_qty AS cur_in, c.out_qty AS cur_out, c.shrink_qty AS cur_shrink, c.turn_val AS cur_val, " +
-                "       p.in_qty AS prev_in, p.out_qty AS prev_out, p.shrink_qty AS prev_shrink, p.turn_val AS prev_val " +
+                "SELECT c.out_tx AS cur_out_tx, c.out_qty AS cur_out_qty, c.in_qty AS cur_in_qty, c.active_prods AS cur_active_prods, " +
+                "       c.shrink_qty AS cur_shrink, c.turn_val AS cur_val, " +
+                "       p.out_tx AS prev_out_tx, p.out_qty AS prev_out_qty, p.in_qty AS prev_in_qty, p.active_prods AS prev_active_prods, " +
+                "       p.shrink_qty AS prev_shrink, p.turn_val AS prev_val " +
                 "FROM cur_period c, prev_period p";
 
         try (Connection conn = DatabaseConfig.getConnection(orgId);
@@ -127,10 +147,14 @@ public class AnalyticsDao {
 
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    double curIn = rs.getDouble("cur_in");
-                    double prevIn = rs.getDouble("prev_in");
-                    double curOut = rs.getDouble("cur_out");
-                    double prevOut = rs.getDouble("prev_out");
+                    double curOutTx = rs.getDouble("cur_out_tx");
+                    double prevOutTx = rs.getDouble("prev_out_tx");
+                    double curIn = rs.getDouble("cur_in_qty");
+                    double prevIn = rs.getDouble("prev_in_qty");
+                    double curOut = rs.getDouble("cur_out_qty");
+                    double prevOut = rs.getDouble("prev_out_qty");
+                    double curActiveProds = rs.getDouble("cur_active_prods");
+                    double prevActiveProds = rs.getDouble("prev_active_prods");
                     double curShrink = rs.getDouble("cur_shrink");
                     double prevShrink = rs.getDouble("prev_shrink");
                     double curVal = rs.getDouble("cur_val");
@@ -139,10 +163,17 @@ public class AnalyticsDao {
                     double curNet = curIn - curOut;
                     double prevNet = prevIn - prevOut;
 
+                    double curAvgDaily = curOut / days;
+                    double prevAvgDaily = prevOut / days;
+
                     double curShrinkRate = curOut > 0 ? (curShrink / curOut) * 100.0 : 0.0;
                     double prevShrinkRate = prevOut > 0 ? (prevShrink / prevOut) * 100.0 : 0.0;
 
                     return new AnalyticsKpiSummary(
+                            createComparison(curOutTx, prevOutTx, "events", "%,.0f", true, days),
+                            createComparison(curOut, prevOut, "units", "%,.0f", true, days),
+                            createComparison(curActiveProds, prevActiveProds, "items", "%,.0f", true, days),
+                            createComparison(curAvgDaily, prevAvgDaily, "pcs/day", "%.1f / day", true, days),
                             createComparison(curIn, prevIn, "units", "%,.0f units", true, days),
                             createComparison(curOut, prevOut, "units", "%,.0f units", true, days),
                             createComparison(curNet, prevNet, "units", "%+,.0f units", true, days),
@@ -484,6 +515,10 @@ public class AnalyticsDao {
 
     private AnalyticsKpiSummary getDemoKpiSummary(int days) {
         return new AnalyticsKpiSummary(
+                createComparison(120, 105, "events", "%,.0f", true, days),
+                createComparison(360, 310, "pcs", "%,.0f pcs", true, days),
+                createComparison(45, 42, "items", "%,.0f items", true, days),
+                createComparison(360.0 / days, 310.0 / days, "pcs/day", "%.1f / day", true, days),
                 createComparison(480, 420, "units", "%,.0f units", true, days),
                 createComparison(360, 310, "units", "%,.0f units", true, days),
                 createComparison(120, 110, "units", "%+,.0f units", true, days),
@@ -494,6 +529,10 @@ public class AnalyticsDao {
 
     private AnalyticsKpiSummary getZeroKpiSummary(int days) {
         return new AnalyticsKpiSummary(
+                createComparison(0, 0, "events", "0", true, days),
+                createComparison(0, 0, "pcs", "0 pcs", true, days),
+                createComparison(0, 0, "items", "0 items", true, days),
+                createComparison(0, 0, "pcs/day", "0.0 / day", true, days),
                 createComparison(0, 0, "units", "0 units", true, days),
                 createComparison(0, 0, "units", "0 units", true, days),
                 createComparison(0, 0, "units", "0 units", true, days),

@@ -15,17 +15,20 @@ public class DashboardService {
     private final ProductDao productDao;
     private final StockMovementDao stockMovementDao;
     private final AiInsightDao aiInsightDao;
+    private final AIInsightService aiInsightService;
 
     public DashboardService() {
         this.productDao = new ProductDao();
         this.stockMovementDao = new StockMovementDao();
         this.aiInsightDao = new AiInsightDao();
+        this.aiInsightService = new AIInsightService(this.aiInsightDao, this.productDao);
     }
 
     public DashboardService(ProductDao productDao, StockMovementDao stockMovementDao, AiInsightDao aiInsightDao) {
         this.productDao = productDao;
         this.stockMovementDao = stockMovementDao;
         this.aiInsightDao = aiInsightDao;
+        this.aiInsightService = new AIInsightService(this.aiInsightDao, this.productDao);
     }
 
     public record DashboardData(
@@ -47,7 +50,8 @@ public class DashboardService {
         ProductDao.ProductSummaryMetrics productMetrics = productDao.getSummaryMetrics(organizationId);
         int todayDeductions = stockMovementDao.getTodayDeductionsCount(organizationId);
         List<StockMovementDao.DailyMovementPoint> movementHistory = stockMovementDao.getDailyMovementHistory(7, organizationId);
-        List<AiInsight> activeInsights = aiInsightDao.findActiveInsights(5, organizationId);
+        User current = AuthService.getCurrentUser();
+        List<AiInsight> activeInsights = aiInsightService.getInsights(current).insights();
         List<Product> needsRestockList = productDao.findNeedsRestock(6, organizationId);
         List<StockMovement> recentMovements = stockMovementDao.findRecentMovements(8, organizationId);
 

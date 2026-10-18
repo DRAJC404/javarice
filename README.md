@@ -890,6 +890,38 @@ Staff members do **not** register publicly and there are no invite links or appr
 
 ---
 
+# AI Configuration & Security Architecture
+
+bAI integrates AI-driven analytics, restocking recommendations, and the **Ask bAI** inventory copilot.
+
+### 1. Environment Configuration (`.env`)
+To configure AI services locally, copy `.env.example` to `.env` in the working directory:
+```bash
+cp .env.example .env
+```
+Populate the environment variables:
+```properties
+# AI Configuration (.env)
+AI_API_KEY=your_gemini_or_groq_api_key_here
+AI_MODEL=gemini-1.5-flash
+AI_BASE_URL=
+```
+* **Resolution Order**: `EnvConfig` reads real system environment variables first (`System.getenv`), then falls back to `.env` in the working directory.
+* **Safe Diagnostics**: The application never displays or logs the raw API key. All diagnostic outputs and logs mask keys (e.g., `gsk_...****` or `[NOT CONFIGURED]`).
+* **Rule-Based Fallback**: If `AI_API_KEY` is omitted, bAI smoothly falls back to an offline rule-based heuristic engine with a small `"AI model not configured"` notice.
+
+### 2. Architecture & Production Notice
+> [!WARNING]
+> **DEMO ONLY NOTICE**: Shipping an AI API key inside a client-side desktop application binary or `.env` file is strictly intended for local development and offline demonstrations. In a commercial or production environment, desktop clients must **never** hold raw LLM provider API credentials. All AI requests must be routed through an authenticated backend API service that securely holds credentials, enforces per-tenant quotas, and performs server-side prompt validation.
+
+### 3. Tenant Privacy & Aggregation Safeguards
+* **Zero PII**: Only aggregated, anonymous inventory totals (e.g., product counts, total units deducted, velocity numbers) for the authenticated tenant are transmitted to the LLM. No user names, emails, customer records, or internal database IDs are ever sent.
+* **Tenant Isolation**: "Ask bAI" and analytics queries are strictly scoped to the authenticated organization's verified session via PostgreSQL Row-Level Security (`app.current_organization_id`).
+* **Rate Limits & Caching**: LLM calls are limited to 20 calls per organization per day (tracked in `ai_usage_tracking`), and cached in `ai_insights` with a 1-hour expiration window.
+* **7-Day History Guard**: Stores with fewer than 7 days of movement records automatically skip LLM calls and display rule-based insights.
+
+---
+
 # bAI — AI Business Assistant
 
 AI-Powered Inventory & Retail Management Assistant built for Filipino retail store employees and business owners. Real-time stock tracking, automated par-level alerts, intelligent shift audits, and full-screen kiosk support.
