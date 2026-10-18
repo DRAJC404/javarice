@@ -24,6 +24,7 @@ public class AppDialog extends VBox {
         getStyleClass().add("dialog-modal-card");
         setMaxWidth(width);
         setPrefWidth(width);
+        setMaxHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
 
         BorderPane header = new BorderPane();
         header.getStyleClass().add("dialog-header");
@@ -50,6 +51,12 @@ public class AppDialog extends VBox {
         scrollPane.getStyleClass().add("scroll-pane");
         scrollPane.setMaxHeight(480);
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
+
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                scrollPane.maxHeightProperty().bind(newScene.heightProperty().multiply(0.70));
+            }
+        });
 
         footerContainer = new HBox(12);
         footerContainer.setAlignment(Pos.CENTER_RIGHT);
@@ -80,5 +87,11 @@ public class AppDialog extends VBox {
 
     public void show() {
         ViewNavigator.showCustomDialog(this);
+        javafx.application.Platform.runLater(() -> {
+            if (!footerContainer.getChildren().isEmpty()) {
+                Node primaryBtn = footerContainer.getChildren().get(footerContainer.getChildren().size() - 1);
+                primaryBtn.requestFocus();
+            }
+        });
     }
 }

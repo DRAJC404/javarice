@@ -31,15 +31,15 @@ import java.util.Locale;
 
 public class DashboardView extends StackPane implements Disposable {
 
-    private static final String SVG_REFRESH   = "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z";
-    private static final String SVG_PACKAGE   = "M20 7l-8-4-8 4 8 4 8-4zm0 6l-8 4-8-4m16 4l-8 4-8-4";
-    private static final String SVG_WARNING   = "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z";
-    private static final String SVG_ALERT     = "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z";
-    private static final String SVG_CART      = "M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z";
-    private static final String SVG_VALUATION = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z";
-    private static final String SVG_SPARKLE   = "M12 2L9.5 8.5 3 11l6.5 2.5L12 20l2.5-6.5L21 11l-6.5-2.5z";
-    private static final String SVG_ARROW_UP  = "M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z";
-    private static final String SVG_ARROW_DN  = "M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z";
+    private static final String SVG_REFRESH    = "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z";
+    private static final String SVG_PACKAGE    = "M20 7l-8-4-8 4 8 4 8-4zm0 6l-8 4-8-4m16 4l-8 4-8-4";
+    private static final String SVG_WARNING    = "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z";
+    private static final String SVG_X_CIRCLE   = "M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z";
+    private static final String SVG_TREND_DOWN = "M16 18l2.29-2.29-4.88-4.88-4 4L2 7.41 3.41 6l6 6 4-4 6.3 6.29L22 12v6z";
+    private static final String SVG_WALLET     = "M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z";
+    private static final String SVG_SPARKLE    = "M12 2L9.5 8.5 3 11l6.5 2.5L12 20l2.5-6.5L21 11l-6.5-2.5z";
+    private static final String SVG_ARROW_UP   = "M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z";
+    private static final String SVG_ARROW_DN   = "M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z";
 
     private final DashboardService dashboardService;
     private final NumberFormat pesoFormat = NumberFormat.getCurrencyInstance(new Locale("en", "PH"));
@@ -85,12 +85,16 @@ public class DashboardView extends StackPane implements Disposable {
         errorPane.getChildren().addAll(errIcon, errorLabel, retryBtn);
 
         contentBox = new VBox(24);
-        contentBox.setPadding(new Insets(10, 10, 40, 10));
+        contentBox.setPadding(new Insets(32));
+        contentBox.setMaxWidth(1400);
 
-        contentScroll = new ScrollPane(contentBox);
+        StackPane centerWrapper = new StackPane(contentBox);
+        centerWrapper.setAlignment(Pos.TOP_CENTER);
+
+        contentScroll = new ScrollPane(centerWrapper);
         contentScroll.setFitToWidth(true);
         contentScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        contentScroll.setStyle("-fx-background-color: transparent; -fx-background-insets: 0;");
+        contentScroll.getStyleClass().add("scroll-pane");
         contentScroll.setVisible(false);
         contentScroll.setManaged(false);
 
@@ -156,34 +160,27 @@ public class DashboardView extends StackPane implements Disposable {
     }
 
     private Node buildHeader() {
-        HBox header = new HBox(16);
-        header.setAlignment(Pos.CENTER_LEFT);
+        BorderPane header = new BorderPane();
         header.getStyleClass().add("page-header");
 
-        VBox titleBox = new VBox(4);
-        Label title = new Label("Dashboard Overview");
-        title.getStyleClass().add("page-title");
-
         User user = AuthService.getCurrentUser();
-        String name = (user != null) ? user.getFullName() : "Administrator";
+        String name = (user != null && user.getFullName() != null) ? user.getFullName() : "User";
         String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy"));
 
-        Label subtitle = new Label("Welcome back, " + name + " • " + dateStr + " • Real-time inventory tracking & AI recommendations.");
-        subtitle.getStyleClass().add("page-subtitle");
-        titleBox.getChildren().addAll(title, subtitle);
+        Label greetingLabel = new Label("Welcome back, " + name + ". " + dateStr);
+        greetingLabel.getStyleClass().add("page-title");
+        greetingLabel.setWrapText(true);
+        header.setLeft(greetingLabel);
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        refreshBtn = new Button("Refresh Data");
-        refreshBtn.getStyleClass().add("btn-terminal-clear");
+        refreshBtn = new Button("Refresh");
+        refreshBtn.getStyleClass().add("btn-secondary");
         SVGPath refIcon = new SVGPath();
         refIcon.setContent(SVG_REFRESH);
-        refIcon.setStyle("-fx-fill: -text-body;");
+        refIcon.getStyleClass().add("dialog-close-icon");
         refreshBtn.setGraphic(refIcon);
         refreshBtn.setOnAction(e -> loadDashboardDataAsync());
 
-        header.getChildren().addAll(titleBox, spacer, refreshBtn);
+        header.setRight(refreshBtn);
         return header;
     }
 
@@ -192,37 +189,40 @@ public class DashboardView extends StackPane implements Disposable {
         row.setAlignment(Pos.CENTER_LEFT);
 
         var pm = data.productMetrics();
-
         String valFormatted = pesoFormat.format(pm.totalValuation());
 
         row.getChildren().addAll(
-                createStatCard("TOTAL PRODUCTS", String.valueOf(pm.totalProducts()), "Active retail catalog SKUs", "#3B82F6", SVG_PACKAGE),
-                createStatCard("LOW STOCK ALERTS", String.valueOf(pm.lowStockCount()), "Below configured par levels", "#F59E0B", SVG_WARNING),
-                createStatCard("OUT OF STOCK", String.valueOf(pm.outOfStockCount()), "Critically depleted items", "#EF4444", SVG_ALERT),
-                createStatCard("DEDUCTIONS TODAY", String.valueOf(data.todayDeductions()), "Units sold, used or write-off", "#06B6D4", SVG_CART),
-                createStatCard("TOTAL VALUATION", valFormatted, "Total retail stock value", "#10B981", SVG_VALUATION)
+                createStatCard("TOTAL PRODUCTS", String.valueOf(pm.totalProducts()), "Active retail catalog SKUs", "stat-tile-blue", SVG_PACKAGE),
+                createStatCard("LOW STOCK ALERTS", String.valueOf(pm.lowStockCount()), "Below configured par levels", "stat-tile-amber", SVG_WARNING),
+                createStatCard("OUT OF STOCK", String.valueOf(pm.outOfStockCount()), "Critically depleted items", "stat-tile-red", SVG_X_CIRCLE),
+                createStatCard("DEDUCTIONS TODAY", String.valueOf(data.todayDeductions()), "Units sold, used or write-off", "stat-tile-indigo", SVG_TREND_DOWN),
+                createStatCard("TOTAL VALUATION", valFormatted, "Total retail stock value", "stat-tile-green", SVG_WALLET)
         );
 
         return row;
     }
 
-    private Node createStatCard(String label, String value, String subtext, String accentColor, String svgPath) {
-        VBox card = new VBox(8);
+    private Node createStatCard(String label, String value, String subtext, String tileStyleClass, String svgPath) {
+        VBox card = new VBox(4);
         card.getStyleClass().add("stat-card");
         HBox.setHgrow(card, Priority.ALWAYS);
 
-        HBox top = new HBox(12);
+        HBox top = new HBox(8);
         top.setAlignment(Pos.CENTER_LEFT);
 
         Label lbl = new Label(label);
         lbl.getStyleClass().add("stat-label");
         HBox.setHgrow(lbl, Priority.ALWAYS);
 
+        StackPane tile = new StackPane();
+        tile.getStyleClass().addAll("stat-icon-tile", tileStyleClass);
+
         SVGPath icon = new SVGPath();
         icon.setContent(svgPath);
-        icon.setStyle("-fx-fill: " + accentColor + ";");
+        icon.getStyleClass().add("stat-tile-icon");
+        tile.getChildren().add(icon);
 
-        top.getChildren().addAll(lbl, icon);
+        top.getChildren().addAll(lbl, tile);
 
         Label val = new Label(value);
         val.getStyleClass().add("stat-value");
@@ -234,31 +234,68 @@ public class DashboardView extends StackPane implements Disposable {
         return card;
     }
 
+    private String formatItems(int count) {
+        return count + " " + (count == 1 ? "item" : "items");
+    }
+
+    private String formatPcs(int count, String unit) {
+        String u = (unit != null && !unit.isBlank()) ? unit : "pc";
+        if ("pcs".equalsIgnoreCase(u) || "pc".equalsIgnoreCase(u)) {
+            return count + " " + (count == 1 ? "pc" : "pcs");
+        }
+        return count + " " + (count == 1 ? u : u + "s");
+    }
+
     private Node buildChartCard(DashboardService.DashboardData data) {
         VBox card = new VBox(14);
         card.getStyleClass().add("card");
 
-        HBox header = new HBox(10);
-        header.setAlignment(Pos.CENTER_LEFT);
+        BorderPane header = new BorderPane();
 
         Label title = new Label("Stock Movement Trends (Past 7 Days)");
         title.setStyle("-fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -text-main;");
+        header.setLeft(title);
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox legends = new HBox(12);
+        legends.setAlignment(Pos.CENTER_RIGHT);
 
         Label legendIn = new Label("■ Stock IN (Restock)");
-        legendIn.setStyle("-fx-font-size: 11.5px; -fx-font-weight: 700; -fx-text-fill: #10B981;");
+        legendIn.getStyleClass().add("legend-in-text");
 
         Label legendOut = new Label("■ Stock OUT (Deduction)");
-        legendOut.setStyle("-fx-font-size: 11.5px; -fx-font-weight: 700; -fx-text-fill: #3B82F6;");
+        legendOut.getStyleClass().add("legend-out-text");
 
-        header.getChildren().addAll(title, spacer, legendIn, legendOut);
+        legends.getChildren().addAll(legendIn, legendOut);
+        header.setRight(legends);
+
+        boolean allZero = true;
+        for (var point : data.movementHistory()) {
+            if (point.inQty() > 0 || point.outQty() > 0) {
+                allZero = false;
+                break;
+            }
+        }
+
+        if (allZero || data.movementHistory().isEmpty()) {
+            VBox emptyBox = new VBox(6);
+            emptyBox.getStyleClass().add("chart-empty-box");
+            Label emptyTitle = new Label("No stock movement yet");
+            emptyTitle.getStyleClass().add("chart-empty-text");
+            Label emptySub = new Label("Stock IN and stock OUT deductions will appear here over the past 7 days.");
+            emptySub.getStyleClass().add("chart-empty-subtext");
+            emptyBox.getChildren().addAll(emptyTitle, emptySub);
+            card.getChildren().addAll(header, emptyBox);
+            return card;
+        }
 
         CategoryAxis xAxis = new CategoryAxis();
+        xAxis.setLabel(null);
+
         NumberAxis yAxis = new NumberAxis();
-        xAxis.setLabel("Day");
-        yAxis.setLabel("Quantity");
+        yAxis.setLabel(null);
+        yAxis.setTickUnit(1);
+        yAxis.setMinorTickVisible(false);
+        yAxis.setForceZeroInRange(true);
 
         BarChart<String, Number> barChart = new BarChart<>(xAxis, yAxis);
         barChart.setLegendVisible(false);
@@ -287,29 +324,45 @@ public class DashboardView extends StackPane implements Disposable {
         VBox card = new VBox(14);
         card.getStyleClass().add("card");
 
-        HBox header = new HBox(10);
-        header.setAlignment(Pos.CENTER_LEFT);
+        BorderPane header = new BorderPane();
 
+        HBox titleBox = new HBox(8);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
         SVGPath sparkle = new SVGPath();
         sparkle.setContent(SVG_SPARKLE);
         sparkle.setStyle("-fx-fill: -primary;");
 
         Label title = new Label("bAI Smart Insights");
         title.setStyle("-fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -text-main;");
+        titleBox.getChildren().addAll(sparkle, title);
+        header.setLeft(titleBox);
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        Label badge = new Label(data.activeInsights().size() + " Active");
+        int activeCount = data.activeInsights().size();
+        Label badge = new Label(activeCount + " Active");
         badge.setStyle("-fx-font-size: 11px; -fx-font-weight: 800; -fx-text-fill: -primary; -fx-background-color: -primary-light; -fx-padding: 3 8; -fx-background-radius: 6;");
-
-        header.getChildren().addAll(sparkle, title, spacer, badge);
+        if (activeCount == 0) {
+            badge.setVisible(false);
+            badge.setManaged(false);
+        }
+        header.setRight(badge);
 
         VBox list = new VBox(10);
         if (data.activeInsights().isEmpty()) {
-            Label empty = new Label("All stock levels healthy. No urgent AI alerts.");
-            empty.setStyle("-fx-text-fill: -text-muted; -fx-font-size: 13px; -fx-padding: 20 0;");
-            list.getChildren().add(empty);
+            VBox emptyBox = new VBox(6);
+            emptyBox.getStyleClass().add("insights-empty-box");
+
+            SVGPath emptyIcon = new SVGPath();
+            emptyIcon.setContent(SVG_SPARKLE);
+            emptyIcon.getStyleClass().add("insights-empty-icon");
+
+            Label emptyTitle = new Label("No insights yet");
+            emptyTitle.getStyleClass().add("insights-empty-title");
+
+            Label emptySub = new Label("Insights appear after a week of stock movement.");
+            emptySub.getStyleClass().add("insights-empty-sub");
+
+            emptyBox.getChildren().addAll(emptyIcon, emptyTitle, emptySub);
+            list.getChildren().add(emptyBox);
         } else {
             for (AiInsight insight : data.activeInsights()) {
                 list.getChildren().add(createInsightItem(insight));
@@ -381,19 +434,15 @@ public class DashboardView extends StackPane implements Disposable {
         VBox card = new VBox(14);
         card.getStyleClass().add("card");
 
-        HBox header = new HBox(10);
-        header.setAlignment(Pos.CENTER_LEFT);
+        BorderPane header = new BorderPane();
 
         Label title = new Label("Needs Restock Immediately");
         title.setStyle("-fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -text-main;");
+        header.setLeft(title);
 
-        Region sp = new Region();
-        HBox.setHgrow(sp, Priority.ALWAYS);
-
-        Label countBadge = new Label(data.needsRestockList().size() + " Items");
+        Label countBadge = new Label(formatItems(data.needsRestockList().size()));
         countBadge.setStyle("-fx-font-size: 11px; -fx-font-weight: 800; -fx-text-fill: -status-warning; -fx-background-color: -status-warning-bg; -fx-padding: 3 8; -fx-background-radius: 6;");
-
-        header.getChildren().addAll(title, sp, countBadge);
+        header.setRight(countBadge);
 
         VBox list = new VBox(8);
         if (data.needsRestockList().isEmpty()) {
@@ -413,31 +462,55 @@ public class DashboardView extends StackPane implements Disposable {
     private Node createRestockRow(Product p) {
         HBox row = new HBox(12);
         row.setAlignment(Pos.CENTER_LEFT);
-        row.setStyle("-fx-background-color: #F8FAFC; -fx-background-radius: 8; -fx-padding: 10 14; -fx-border-color: #E2E8F0; -fx-border-width: 1; -fx-border-radius: 8;");
+        row.getStyleClass().add("dashboard-item-row");
+
+        StackPane thumbBox = new StackPane();
+        thumbBox.getStyleClass().add("item-thumb-box");
+
+        boolean hasThumb = false;
+        if (p.getImagePath() != null) {
+            javafx.scene.image.Image cached = AppExecutor.getCachedImage(p.getImagePath(), 36, 36);
+            if (cached != null) {
+                javafx.scene.image.ImageView iv = new javafx.scene.image.ImageView(cached);
+                iv.setFitWidth(36);
+                iv.setFitHeight(36);
+                iv.setPreserveRatio(true);
+                thumbBox.getChildren().add(iv);
+                hasThumb = true;
+            }
+        }
+        if (!hasThumb) {
+            SVGPath boxIcon = new SVGPath();
+            boxIcon.setContent(SVG_PACKAGE);
+            boxIcon.getStyleClass().add("item-thumb-icon");
+            thumbBox.getChildren().add(boxIcon);
+        }
 
         VBox info = new VBox(2);
         Label name = new Label(p.getName());
         name.setStyle("-fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: -text-main;");
+        name.setWrapText(true);
 
-        Label sku = new Label("SKU: " + p.getSku() + " • Category: " + (p.getCategoryName() != null ? p.getCategoryName() : "General"));
+        Label sku = new Label("SKU: " + p.getSku() + " • " + (p.getCategoryName() != null ? p.getCategoryName() : "General"));
         sku.setStyle("-fx-font-size: 11px; -fx-text-fill: -text-muted;");
+        sku.setWrapText(true);
         info.getChildren().addAll(name, sku);
         HBox.setHgrow(info, Priority.ALWAYS);
 
         VBox countBox = new VBox(2);
         countBox.setAlignment(Pos.CENTER_RIGHT);
 
-        String countText = p.getStockQuantity() + " / " + p.getLowStockThreshold() + " " + p.getUnit();
+        String countText = p.getStockQuantity() + " / " + p.getLowStockThreshold() + " " + formatPcs(p.getStockQuantity(), p.getUnit());
         Label countLbl = new Label(countText);
-        countLbl.setStyle("-fx-font-size: 13px; -fx-font-weight: 800; -fx-text-fill: " + (p.getStockQuantity() == 0 ? "#EF4444" : "#F59E0B") + ";");
+        countLbl.setStyle("-fx-font-size: 12.5px; -fx-font-weight: 800; -fx-text-fill: " + (p.getStockQuantity() == 0 ? "#EF4444" : "#F59E0B") + ";");
 
         Label statusLbl = new Label(p.getStatus().replace("_", " "));
-        statusLbl.setStyle("-fx-font-size: 10.5px; -fx-font-weight: 700; -fx-text-fill: -text-muted;");
+        statusLbl.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: -text-muted;");
 
         countBox.getChildren().addAll(countLbl, statusLbl);
 
         Button restockBtn = new Button("Restock");
-        restockBtn.setStyle("-fx-background-color: -primary; -fx-text-fill: white; -fx-font-size: 11.5px; -fx-font-weight: 700; -fx-padding: 5 12; -fx-background-radius: 6; -fx-cursor: hand;");
+        restockBtn.getStyleClass().add("btn-restock-action");
         restockBtn.setOnAction(e -> {
             ViewNavigator.showOverlayDialog(
                     "Restock Reorder Notice",
@@ -450,7 +523,7 @@ public class DashboardView extends StackPane implements Disposable {
             );
         });
 
-        row.getChildren().addAll(info, countBox, restockBtn);
+        row.getChildren().addAll(thumbBox, info, countBox, restockBtn);
         return row;
     }
 
@@ -458,19 +531,15 @@ public class DashboardView extends StackPane implements Disposable {
         VBox card = new VBox(14);
         card.getStyleClass().add("card");
 
-        HBox header = new HBox(10);
-        header.setAlignment(Pos.CENTER_LEFT);
+        BorderPane header = new BorderPane();
 
         Label title = new Label("Recent Stock Movements");
         title.setStyle("-fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -text-main;");
-
-        Region sp = new Region();
-        HBox.setHgrow(sp, Priority.ALWAYS);
+        header.setLeft(title);
 
         Label subtitle = new Label("Live Audit Stream");
         subtitle.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: -text-muted;");
-
-        header.getChildren().addAll(title, sp, subtitle);
+        header.setRight(subtitle);
 
         VBox list = new VBox(8);
         if (data.recentMovements().isEmpty()) {
@@ -490,22 +559,28 @@ public class DashboardView extends StackPane implements Disposable {
     private Node createMovementRow(StockMovement m) {
         HBox row = new HBox(12);
         row.setAlignment(Pos.CENTER_LEFT);
-        row.setStyle("-fx-background-color: #F8FAFC; -fx-background-radius: 8; -fx-padding: 10 14; -fx-border-color: #E2E8F0; -fx-border-width: 1; -fx-border-radius: 8;");
+        row.getStyleClass().add("dashboard-item-row");
+
+        boolean isOut = "OUT".equalsIgnoreCase(m.getMovementType());
+        StackPane iconBox = new StackPane();
+        iconBox.getStyleClass().add("item-thumb-box");
 
         SVGPath icon = new SVGPath();
-        boolean isOut = "OUT".equalsIgnoreCase(m.getMovementType());
         icon.setContent(isOut ? SVG_ARROW_DN : SVG_ARROW_UP);
         icon.setStyle("-fx-fill: " + (isOut ? "#EF4444" : "#10B981") + ";");
+        iconBox.getChildren().add(icon);
 
         VBox info = new VBox(2);
         Label name = new Label(m.getProductName() != null ? m.getProductName() : "Product #" + m.getProductId());
         name.setStyle("-fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: -text-main;");
+        name.setWrapText(true);
 
         String timeStr = (m.getCreatedAt() != null)
                 ? m.getCreatedAt().format(DateTimeFormatter.ofPattern("MMM dd, HH:mm"))
                 : "Recent";
         Label details = new Label(m.getReferenceNo() + " • " + timeStr + " • By " + (m.getUserName() != null ? m.getUserName() : "User"));
         details.setStyle("-fx-font-size: 11px; -fx-text-fill: -text-muted;");
+        details.setWrapText(true);
 
         info.getChildren().addAll(name, details);
         HBox.setHgrow(info, Priority.ALWAYS);
@@ -513,11 +588,11 @@ public class DashboardView extends StackPane implements Disposable {
         Label reasonBadge = new Label(m.getReason());
         reasonBadge.setStyle("-fx-font-size: 10.5px; -fx-font-weight: 800; -fx-text-fill: -text-muted; -fx-background-color: #E2E8F0; -fx-padding: 3 8; -fx-background-radius: 4;");
 
-        String delta = (isOut ? "-" : "+") + m.getQuantity() + " pcs";
+        String delta = (isOut ? "-" : "+") + formatPcs(m.getQuantity(), "pc");
         Label qtyLbl = new Label(delta);
         qtyLbl.setStyle("-fx-font-size: 13px; -fx-font-weight: 800; -fx-text-fill: " + (isOut ? "#EF4444" : "#10B981") + ";");
 
-        row.getChildren().addAll(icon, info, reasonBadge, qtyLbl);
+        row.getChildren().addAll(iconBox, info, reasonBadge, qtyLbl);
         return row;
     }
 

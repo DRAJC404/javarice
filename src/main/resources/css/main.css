@@ -68,6 +68,9 @@
 .sidebar-item {
     -fx-background-color: transparent;
     -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
     -fx-padding: 12 16 12 16;
     -fx-alignment: CENTER_LEFT;
     -fx-cursor: hand;
@@ -181,7 +184,9 @@
     -fx-border-width: 1;
     -fx-padding: 18 20 18 20;
     -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.04), 8, 0, 0, 2);
-    -fx-pref-height: 115px;
+    -fx-pref-height: 125px;
+    -fx-min-height: 125px;
+    -fx-max-height: 125px;
 }
 .stat-card:hover {
     -fx-border-color: -border-medium;
@@ -203,19 +208,57 @@
     -fx-border-color: -status-info-border;
 }
 .stat-label, .stat-card-title {
-    -fx-font-size: 13px;
-    -fx-font-weight: 600;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
     -fx-text-fill: -text-muted;
 }
 .stat-value, .stat-card-value {
     -fx-font-size: 26px;
     -fx-font-weight: 800;
     -fx-text-fill: -text-main;
-    -fx-padding: 4 0 4 0;
+    -fx-padding: 2 0 2 0;
 }
 .stat-subtext, .stat-card-sub {
     -fx-font-size: 12px;
     -fx-text-fill: -text-muted;
+}
+.stat-icon-tile {
+    -fx-min-width: 36px;
+    -fx-max-width: 36px;
+    -fx-min-height: 36px;
+    -fx-max-height: 36px;
+    -fx-background-radius: 10;
+    -fx-alignment: CENTER;
+}
+.stat-tile-blue {
+    -fx-background-color: #EFF6FF;
+}
+.stat-tile-blue > .stat-tile-icon {
+    -fx-fill: #3B82F6;
+}
+.stat-tile-amber {
+    -fx-background-color: #FFFBEB;
+}
+.stat-tile-amber > .stat-tile-icon {
+    -fx-fill: #F59E0B;
+}
+.stat-tile-red {
+    -fx-background-color: #FEF2F2;
+}
+.stat-tile-red > .stat-tile-icon {
+    -fx-fill: #EF4444;
+}
+.stat-tile-indigo {
+    -fx-background-color: #EEF2FF;
+}
+.stat-tile-indigo > .stat-tile-icon {
+    -fx-fill: #6366F1;
+}
+.stat-tile-green {
+    -fx-background-color: #ECFDF5;
+}
+.stat-tile-green > .stat-tile-icon {
+    -fx-fill: #10B981;
 }
 .stat-icon-box {
     -fx-background-radius: 10;
@@ -824,6 +867,106 @@
     -fx-padding: 14 0 0 0;
     -fx-border-color: -border-subtle transparent transparent transparent;
     -fx-border-width: 1 0 0 0;
+}
+.dialog-icon-success {
+    -fx-fill: -status-success;
+}
+.dialog-icon-warning {
+    -fx-fill: -status-warning;
+}
+.dialog-icon-danger {
+    -fx-fill: -status-danger;
+}
+.dialog-icon-info {
+    -fx-fill: -primary;
+}
+.dialog-body-text {
+    -fx-font-size: 13.5px;
+    -fx-text-fill: -text-body;
+    -fx-line-spacing: 3px;
+}
+.sidebar-icon-box {
+    -fx-min-width: 20px;
+    -fx-max-width: 20px;
+    -fx-min-height: 20px;
+    -fx-max-height: 20px;
+    -fx-alignment: CENTER;
+}
+.dashboard-item-row {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 8;
+    -fx-padding: 10 14;
+    -fx-border-color: #E2E8F0;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+}
+.item-thumb-box {
+    -fx-min-width: 36px;
+    -fx-max-width: 36px;
+    -fx-min-height: 36px;
+    -fx-max-height: 36px;
+    -fx-background-color: #F1F5F9;
+    -fx-background-radius: 6;
+    -fx-alignment: CENTER;
+}
+.item-thumb-icon {
+    -fx-fill: #94A3B8;
+}
+.btn-restock-action {
+    -fx-background-color: -primary;
+    -fx-text-fill: white;
+    -fx-font-size: 11.5px;
+    -fx-font-weight: 700;
+    -fx-padding: 4 12;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+    -fx-pref-height: 28px;
+    -fx-min-height: 28px;
+}
+.btn-restock-action:hover {
+    -fx-background-color: -primary-hover;
+}
+.chart-empty-box {
+    -fx-alignment: CENTER;
+    -fx-pref-height: 250px;
+    -fx-min-height: 250px;
+    -fx-spacing: 6;
+}
+.chart-empty-text {
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -text-muted;
+}
+.chart-empty-subtext {
+    -fx-font-size: 12px;
+    -fx-text-fill: -text-muted;
+}
+.legend-in-text {
+    -fx-font-size: 11.5px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #10B981;
+}
+.legend-out-text {
+    -fx-font-size: 11.5px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #3B82F6;
+}
+.insights-empty-box {
+    -fx-alignment: CENTER;
+    -fx-padding: 30 16;
+    -fx-spacing: 6;
+}
+.insights-empty-icon {
+    -fx-fill: -text-muted;
+}
+.insights-empty-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -text-muted;
+}
+.insights-empty-sub {
+    -fx-font-size: 12px;
+    -fx-text-fill: -text-muted;
 }
 .splash-view {
     -fx-background-color: #0F172A;

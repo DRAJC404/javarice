@@ -144,6 +144,8 @@ public class MainLayoutView extends StackPane implements Disposable {
         return navbar;
     }
 
+    private Button sidebarLogoutBtn;
+
     private Node buildUserTopMenu(User user) {
         HBox userBox = new HBox(12);
         userBox.getStyleClass().add("top-navbar-user-box");
@@ -164,16 +166,7 @@ public class MainLayoutView extends StackPane implements Disposable {
         roleLabel.getStyleClass().add("top-navbar-user-role");
         metaBox.getChildren().addAll(nameLabel, roleLabel);
 
-        Button logoutBtn = new Button("Log out");
-        logoutBtn.getStyleClass().add("sidebar-logout-btn");
-        logoutBtn.setOnAction(e -> ViewNavigator.showConfirmDialog(
-                "Sign Out",
-                "Are you sure you want to log out of the management console?",
-                "Sign Out",
-                ViewNavigator::logout
-        ));
-
-        userBox.getChildren().addAll(avatar, metaBox, logoutBtn);
+        userBox.getChildren().addAll(avatar, metaBox);
         return userBox;
     }
 
@@ -186,13 +179,13 @@ public class MainLayoutView extends StackPane implements Disposable {
         VBox brandBox = new VBox(8);
         brandBox.getStyleClass().add("sidebar-brand-box");
 
-        HBox logoRow = new HBox(8);
+        HBox logoRow = new HBox(10);
         logoRow.setAlignment(Pos.CENTER_LEFT);
 
         try (InputStream is = getClass().getResourceAsStream("/images/bailogo.png")) {
             if (is != null) {
                 ImageView logoImg = new ImageView(new Image(is));
-                logoImg.setFitHeight(30);
+                logoImg.setFitHeight(36);
                 logoImg.setPreserveRatio(true);
                 logoRow.getChildren().add(logoImg);
             }
@@ -201,7 +194,7 @@ public class MainLayoutView extends StackPane implements Disposable {
         brandTitle = new Label("bAI");
         brandTitle.getStyleClass().add("sidebar-logo");
 
-        tagBadge = new Label("INVENTORY");
+        tagBadge = new Label("Inventory");
         tagBadge.getStyleClass().add("sidebar-logo-tag");
 
         logoRow.getChildren().addAll(brandTitle, tagBadge);
@@ -239,19 +232,22 @@ public class MainLayoutView extends StackPane implements Disposable {
         btn.setMaxWidth(Double.MAX_VALUE);
         btn.setAlignment(Pos.CENTER_LEFT);
 
-        HBox row = new HBox(14);
+        HBox row = new HBox(12);
         row.setAlignment(Pos.CENTER_LEFT);
+
+        StackPane iconBox = new StackPane();
+        iconBox.getStyleClass().add("sidebar-icon-box");
 
         SVGPath icon = new SVGPath();
         icon.setContent(svgPath);
         icon.getStyleClass().add("sidebar-item-icon");
-        icon.setScaleX(1.1);
-        icon.setScaleY(1.1);
+
+        iconBox.getChildren().add(icon);
 
         Label label = new Label(labelText);
         label.getStyleClass().add("sidebar-item-label");
 
-        row.getChildren().addAll(icon, label);
+        row.getChildren().addAll(iconBox, label);
         btn.setGraphic(row);
 
         btn.setOnAction(e -> {
@@ -295,6 +291,7 @@ public class MainLayoutView extends StackPane implements Disposable {
         Button logoutBtn = new Button();
         logoutBtn.getStyleClass().add("sidebar-logout-btn");
         logoutBtn.setMaxWidth(Double.MAX_VALUE);
+        this.sidebarLogoutBtn = logoutBtn;
 
         HBox logoutContent = new HBox(8);
         logoutContent.setAlignment(Pos.CENTER);
@@ -309,9 +306,9 @@ public class MainLayoutView extends StackPane implements Disposable {
         logoutContent.getChildren().addAll(logoutIcon, logoutTextLabel);
         logoutBtn.setGraphic(logoutContent);
         logoutBtn.setOnAction(e -> ViewNavigator.showConfirmDialog(
-                "Sign Out",
-                "Are you sure you want to log out of the management console?",
-                "Sign Out",
+                "Sign out?",
+                "You will need to sign in again to continue.",
+                "Sign out",
                 ViewNavigator::logout
         ));
 
@@ -392,6 +389,7 @@ public class MainLayoutView extends StackPane implements Disposable {
             if (logoutTextLabel != null) { logoutTextLabel.setVisible(true); logoutTextLabel.setManaged(true); }
 
             navButtons.forEach((type, btn) -> btn.setTooltip(null));
+            if (sidebarLogoutBtn != null) sidebarLogoutBtn.setTooltip(null);
         } else {
             sidebarBox.setPrefWidth(72);
             sidebarBox.setMinWidth(72);
@@ -412,6 +410,7 @@ public class MainLayoutView extends StackPane implements Disposable {
                     btn.setTooltip(new Tooltip(label.getText()));
                 }
             });
+            if (sidebarLogoutBtn != null) sidebarLogoutBtn.setTooltip(new Tooltip("Sign Out"));
         }
     }
 

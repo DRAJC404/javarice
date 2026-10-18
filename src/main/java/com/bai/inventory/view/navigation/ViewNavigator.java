@@ -223,6 +223,11 @@ public class ViewNavigator {
             dialogOverlay.getStyleClass().add("app-dialog-overlay");
             dialogOverlay.setVisible(false);
             dialogOverlay.setManaged(false);
+            dialogOverlay.setOnMouseClicked(e -> {
+                if (e.getTarget() == dialogOverlay && !operationInProgress.get()) {
+                    hideOverlayDialog();
+                }
+            });
 
             toastContainer = new VBox(8);
             toastContainer.setAlignment(Pos.BOTTOM_CENTER);
@@ -243,7 +248,7 @@ public class ViewNavigator {
             });
 
             currentScene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-                if (isDialogOpen && event.getCode() == KeyCode.ESCAPE) {
+                if (isDialogOpen && event.getCode() == KeyCode.ESCAPE && !operationInProgress.get()) {
                     hideOverlayDialog();
                     event.consume();
                 }
@@ -265,7 +270,17 @@ public class ViewNavigator {
     }
 
     
+    private static final String SVG_CLOSE = "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z";
+    private static final String SVG_SUCCESS_CHECK = "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z";
+    private static final String SVG_WARNING_TRIANGLE = "M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z";
+    private static final String SVG_ERROR_ALERT = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z";
+    private static final String SVG_INFO_CIRCLE = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z";
+
     public static void showOverlayDialog(String title, String message, OverlayType type, Runnable onConfirm) {
+        showOverlayDialog(title, message, type, "Understood", onConfirm);
+    }
+
+    public static void showOverlayDialog(String title, String message, OverlayType type, String buttonText, Runnable onConfirm) {
         Platform.runLater(() -> {
             if (dialogOverlay == null) return;
 
@@ -275,36 +290,58 @@ public class ViewNavigator {
 
             VBox card = new VBox(16);
             card.getStyleClass().add("dialog-modal-card");
-            card.setMaxWidth(460);
-            card.setAlignment(Pos.TOP_LEFT);
+            card.setMaxWidth(440);
+            card.setPrefWidth(440);
+            card.setMaxHeight(Region.USE_PREF_SIZE);
 
-            HBox header = new HBox(12);
-            header.setAlignment(Pos.CENTER_LEFT);
+            BorderPane header = new BorderPane();
+            header.getStyleClass().add("dialog-header");
+
+            HBox titleLeft = new HBox(10);
+            titleLeft.setAlignment(Pos.CENTER_LEFT);
 
             SVGPath icon = new SVGPath();
-            String iconColor = switch (type) {
-                case ERROR -> "#EF4444";
-                case WARNING -> "#F59E0B";
-                case SUCCESS -> "#10B981";
-                case INFO -> "#3B82F6";
-            };
-            icon.setContent("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z");
-            icon.setStyle("-fx-fill: " + iconColor + ";");
+            switch (type) {
+                case SUCCESS -> {
+                    icon.setContent(SVG_SUCCESS_CHECK);
+                    icon.getStyleClass().add("dialog-icon-success");
+                }
+                case WARNING -> {
+                    icon.setContent(SVG_WARNING_TRIANGLE);
+                    icon.getStyleClass().add("dialog-icon-warning");
+                }
+                case ERROR -> {
+                    icon.setContent(SVG_ERROR_ALERT);
+                    icon.getStyleClass().add("dialog-icon-danger");
+                }
+                case INFO -> {
+                    icon.setContent(SVG_INFO_CIRCLE);
+                    icon.getStyleClass().add("dialog-icon-info");
+                }
+            }
 
             Label titleLabel = new Label(title);
-            titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: 700; -fx-text-fill: #0F172A;");
-            HBox.setHgrow(titleLabel, Priority.ALWAYS);
+            titleLabel.getStyleClass().add("dialog-title");
+            titleLeft.getChildren().addAll(icon, titleLabel);
+            header.setLeft(titleLeft);
 
-            header.getChildren().addAll(icon, titleLabel);
+            Button closeBtn = new Button();
+            closeBtn.getStyleClass().add("btn-dialog-close");
+            SVGPath closeIcon = new SVGPath();
+            closeIcon.setContent(SVG_CLOSE);
+            closeIcon.getStyleClass().add("dialog-close-icon");
+            closeBtn.setGraphic(closeIcon);
+            closeBtn.setOnAction(e -> hideOverlayDialog());
+            header.setRight(closeBtn);
 
             Label messageLabel = new Label(message);
             messageLabel.setWrapText(true);
-            messageLabel.setStyle("-fx-font-size: 13.5px; -fx-text-fill: #475569; -fx-line-spacing: 3px;");
+            messageLabel.getStyleClass().add("dialog-body-text");
 
             HBox buttonRow = new HBox(10);
             buttonRow.setAlignment(Pos.CENTER_RIGHT);
 
-            Button okBtn = new Button("Understood");
+            Button okBtn = new Button(buttonText != null ? buttonText : "Understood");
             okBtn.getStyleClass().add("btn-dialog-confirm");
             okBtn.setOnAction(e -> {
                 hideOverlayDialog();
@@ -314,13 +351,14 @@ public class ViewNavigator {
             buttonRow.getChildren().add(okBtn);
             card.getChildren().addAll(header, messageLabel, buttonRow);
 
+            StackPane.setAlignment(card, Pos.CENTER);
             dialogOverlay.getChildren().add(card);
             dialogOverlay.setVisible(true);
             dialogOverlay.setManaged(true);
+            Platform.runLater(okBtn::requestFocus);
         });
     }
 
-    
     public static void showConfirmDialog(String title, String message, String confirmText, Runnable onConfirm) {
         Platform.runLater(() -> {
             if (dialogOverlay == null) return;
@@ -331,25 +369,37 @@ public class ViewNavigator {
 
             VBox card = new VBox(16);
             card.getStyleClass().add("dialog-modal-card");
-            card.setMaxWidth(460);
-            card.setAlignment(Pos.TOP_LEFT);
+            card.setMaxWidth(440);
+            card.setPrefWidth(440);
+            card.setMaxHeight(Region.USE_PREF_SIZE);
 
-            HBox header = new HBox(12);
-            header.setAlignment(Pos.CENTER_LEFT);
+            BorderPane header = new BorderPane();
+            header.getStyleClass().add("dialog-header");
+
+            HBox titleLeft = new HBox(10);
+            titleLeft.setAlignment(Pos.CENTER_LEFT);
 
             SVGPath icon = new SVGPath();
-            icon.setContent("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z");
-            icon.setStyle("-fx-fill: #F59E0B;");
+            icon.setContent(SVG_WARNING_TRIANGLE);
+            icon.getStyleClass().add("dialog-icon-warning");
 
             Label titleLabel = new Label(title);
-            titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: 700; -fx-text-fill: #0F172A;");
-            HBox.setHgrow(titleLabel, Priority.ALWAYS);
+            titleLabel.getStyleClass().add("dialog-title");
+            titleLeft.getChildren().addAll(icon, titleLabel);
+            header.setLeft(titleLeft);
 
-            header.getChildren().addAll(icon, titleLabel);
+            Button closeBtn = new Button();
+            closeBtn.getStyleClass().add("btn-dialog-close");
+            SVGPath closeIcon = new SVGPath();
+            closeIcon.setContent(SVG_CLOSE);
+            closeIcon.getStyleClass().add("dialog-close-icon");
+            closeBtn.setGraphic(closeIcon);
+            closeBtn.setOnAction(e -> hideOverlayDialog());
+            header.setRight(closeBtn);
 
             Label messageLabel = new Label(message);
             messageLabel.setWrapText(true);
-            messageLabel.setStyle("-fx-font-size: 13.5px; -fx-text-fill: #475569; -fx-line-spacing: 3px;");
+            messageLabel.getStyleClass().add("dialog-body-text");
 
             HBox buttonRow = new HBox(10);
             buttonRow.setAlignment(Pos.CENTER_RIGHT);
@@ -368,9 +418,11 @@ public class ViewNavigator {
             buttonRow.getChildren().addAll(cancelBtn, confirmBtn);
             card.getChildren().addAll(header, messageLabel, buttonRow);
 
+            StackPane.setAlignment(card, Pos.CENTER);
             dialogOverlay.getChildren().add(card);
             dialogOverlay.setVisible(true);
             dialogOverlay.setManaged(true);
+            Platform.runLater(confirmBtn::requestFocus);
         });
     }
 
@@ -380,6 +432,10 @@ public class ViewNavigator {
             contentPane.setDisable(true);
             isDialogOpen = true;
             dialogOverlay.getChildren().clear();
+            if (content instanceof Region reg) {
+                reg.setMaxHeight(Region.USE_PREF_SIZE);
+            }
+            StackPane.setAlignment(content, Pos.CENTER);
             dialogOverlay.getChildren().add(content);
             dialogOverlay.setVisible(true);
             dialogOverlay.setManaged(true);

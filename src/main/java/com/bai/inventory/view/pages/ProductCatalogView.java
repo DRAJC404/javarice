@@ -44,6 +44,7 @@ public class ProductCatalogView extends BorderPane implements Disposable {
 
     private TextField searchField;
     private CategorySelector categoryFilterSelector;
+    private ComboBox<String> statusFilterBox;
     private CheckBox showArchivedCheck;
     private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(250));
     private final AtomicLong searchRequestId = new AtomicLong(0);
@@ -127,18 +128,6 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         refreshBtn.setOnAction(e -> loadInitialData());
 
         actions.getChildren().add(refreshBtn);
-
-        if (!isEmployee) {
-            Button addBtn = new Button("Add Product");
-            addBtn.getStyleClass().add("btn-dialog-confirm");
-            SVGPath plusIcon = new SVGPath();
-            plusIcon.setContent(SVG_PLUS);
-            plusIcon.setStyle("-fx-fill: white;");
-            addBtn.setGraphic(plusIcon);
-            addBtn.setOnAction(e -> openAddProductModal());
-            actions.getChildren().add(addBtn);
-        }
-
         header.setRight(actions);
         return header;
     }
@@ -187,6 +176,7 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         HBox searchBox = new HBox(10);
         searchBox.setAlignment(Pos.CENTER_LEFT);
         searchBox.setStyle("-fx-background-color: white; -fx-background-radius: 8; -fx-border-color: -border-subtle; -fx-border-radius: 8; -fx-padding: 6 12;");
+        searchBox.setMinWidth(260);
         HBox.setHgrow(searchBox, Priority.ALWAYS);
 
         SVGPath searchIcon = new SVGPath();
@@ -194,7 +184,7 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         searchIcon.setStyle("-fx-fill: -text-muted;");
 
         searchField = new TextField();
-        searchField.setPromptText("Search products by Name, SKU, or Barcode...");
+        searchField.setPromptText("Search name, SKU or barcode");
         searchField.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 2; -fx-font-size: 13px;");
         HBox.setHgrow(searchField, Priority.ALWAYS);
 
@@ -205,15 +195,31 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         searchBox.getChildren().addAll(searchIcon, searchField);
 
         categoryFilterSelector = new CategorySelector(CategorySelector.Mode.FILTER);
-        categoryFilterSelector.setPrefWidth(220);
+        categoryFilterSelector.setMinWidth(180);
+        categoryFilterSelector.setPrefWidth(200);
         categoryFilterSelector.selectedCategoryProperty().addListener((obs, oldV, newV) -> reloadProductsAsync());
 
-        showArchivedCheck = new CheckBox("Show Archived");
-        showArchivedCheck.setMinWidth(CheckBox.USE_PREF_SIZE);
-        showArchivedCheck.setStyle("-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: -text-muted;");
-        showArchivedCheck.setOnAction(e -> reloadProductsAsync());
+        statusFilterBox = new ComboBox<>();
+        statusFilterBox.getItems().addAll("All Statuses", "In Stock", "Low Stock", "Out of Stock", "Discontinued");
+        statusFilterBox.getSelectionModel().selectFirst();
+        statusFilterBox.getStyleClass().add("combo-box");
+        statusFilterBox.setMinWidth(140);
+        statusFilterBox.setPrefWidth(150);
+        statusFilterBox.valueProperty().addListener((obs, oldV, newV) -> reloadProductsAsync());
 
-        bar.getChildren().addAll(searchBox, categoryFilterSelector, showArchivedCheck);
+        bar.getChildren().addAll(searchBox, categoryFilterSelector, statusFilterBox);
+
+        if (!isEmployee) {
+            Button addBtn = new Button("Add Product");
+            addBtn.getStyleClass().add("btn-dialog-confirm");
+            SVGPath plusIcon = new SVGPath();
+            plusIcon.setContent(SVG_PLUS);
+            plusIcon.setStyle("-fx-fill: white;");
+            addBtn.setGraphic(plusIcon);
+            addBtn.setOnAction(e -> openAddProductModal());
+            bar.getChildren().add(addBtn);
+        }
+
         return bar;
     }
 
@@ -457,15 +463,25 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         long reqId = searchRequestId.incrementAndGet();
         String query = (searchField != null && searchField.getText() != null) ? searchField.getText().trim() : "";
         Integer catId = (categoryFilterSelector != null) ? categoryFilterSelector.getSelectedCategoryId() : null;
-        boolean showArchived = (showArchivedCheck != null && showArchivedCheck.isSelected());
+        String statusVal = (statusFilterBox != null && statusFilterBox.getValue() != null) ? statusFilterBox.getValue() : "All Statuses";
+        boolean showArchived = "Discontinued".equalsIgnoreCase(statusVal);
 
         AppExecutor.execute(() -> {
             try {
                 List<Product> products = productService.getProducts(query, catId, currentUser, showArchived);
+                if ("In Stock".equalsIgnoreCase(statusVal)) {
+                    products = products.stream().filter(Product::isInStock).toList();
+                } else if ("Low Stock".equalsIgnoreCase(statusVal)) {
+                    products = products.stream().filter(Product::isLowStock).toList();
+                } else if ("Out of Stock".equalsIgnoreCase(statusVal)) {
+                    products = products.stream().filter(Product::isOutOfStock).toList();
+                }
+
+                final List<Product> finalProducts = products;
                 if (reqId == searchRequestId.get()) {
                     Platform.runLater(() -> {
-                        cachedProducts = products;
-                        productTable.getItems().setAll(products);
+                        cachedProducts = finalProducts;
+                        productTable.getItems().setAll(finalProducts);
                     });
                 }
             } catch (Exception ex) {

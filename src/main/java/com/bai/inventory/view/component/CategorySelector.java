@@ -52,12 +52,6 @@ public class CategorySelector extends VBox {
     private final Button newBtn;
     private final HBox selectorRow;
 
-    private final HBox inlineNewRow;
-    private final TextField newNameField;
-    private final Button saveBtn;
-    private final Button cancelBtn;
-    private final Label inlineErrorLabel;
-
     private final ObjectProperty<CategoryItem> selectedCategoryProperty = new SimpleObjectProperty<>();
     private Consumer<Category> onCategoryCreatedCallback;
 
@@ -86,41 +80,14 @@ public class CategorySelector extends VBox {
         newBtn = new Button("+ New");
         newBtn.getStyleClass().addAll("btn-secondary", "btn-new-category");
         newBtn.setMinWidth(Button.USE_PREF_SIZE);
-        newBtn.setVisible(canCreateCategory);
-        newBtn.setManaged(canCreateCategory);
-        newBtn.setOnAction(e -> showInlineNewRow(true));
+        boolean showNew = (mode == Mode.FORM && canCreateCategory);
+        newBtn.setVisible(showNew);
+        newBtn.setManaged(showNew);
+        newBtn.setOnAction(e -> openNewCategoryDialog());
 
         selectorRow.getChildren().addAll(comboBox, newBtn);
 
-        inlineNewRow = new HBox(8);
-        inlineNewRow.setAlignment(Pos.CENTER_LEFT);
-        inlineNewRow.setVisible(false);
-        inlineNewRow.setManaged(false);
-        HBox.setHgrow(inlineNewRow, Priority.ALWAYS);
-
-        newNameField = new TextField();
-        newNameField.setPromptText("Category name (max 60 chars)");
-        newNameField.getStyleClass().add("text-field");
-        HBox.setHgrow(newNameField, Priority.ALWAYS);
-
-        saveBtn = new Button("Save");
-        saveBtn.getStyleClass().add("btn-primary");
-        saveBtn.setMinWidth(Button.USE_PREF_SIZE);
-        saveBtn.setOnAction(e -> handleSaveCategory());
-
-        cancelBtn = new Button("Cancel");
-        cancelBtn.getStyleClass().add("btn-secondary");
-        cancelBtn.setMinWidth(Button.USE_PREF_SIZE);
-        cancelBtn.setOnAction(e -> showInlineNewRow(false));
-
-        inlineNewRow.getChildren().addAll(newNameField, saveBtn, cancelBtn);
-
-        inlineErrorLabel = new Label();
-        inlineErrorLabel.getStyleClass().add("form-error");
-        inlineErrorLabel.setVisible(false);
-        inlineErrorLabel.setManaged(false);
-
-        getChildren().addAll(selectorRow, inlineNewRow, inlineErrorLabel);
+        getChildren().add(selectorRow);
 
         comboBox.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             selectedCategoryProperty.set(newVal);
@@ -161,64 +128,78 @@ public class CategorySelector extends VBox {
         });
     }
 
-    private void showInlineNewRow(boolean show) {
-        selectorRow.setVisible(!show);
-        selectorRow.setManaged(!show);
-        inlineNewRow.setVisible(show);
-        inlineNewRow.setManaged(show);
-        inlineErrorLabel.setVisible(false);
-        inlineErrorLabel.setManaged(false);
-        if (show) {
-            newNameField.clear();
-            newNameField.requestFocus();
-        }
-    }
+    public void openNewCategoryDialog() {
+        AppDialog dialog = new AppDialog("New Category", 440);
 
-    private void handleSaveCategory() {
-        String name = newNameField.getText() != null ? newNameField.getText().trim() : "";
-        if (name.isEmpty()) {
-            inlineErrorLabel.setText("Category name is required.");
-            inlineErrorLabel.setVisible(true);
-            inlineErrorLabel.setManaged(true);
-            return;
-        }
-        if (name.length() > 60) {
-            inlineErrorLabel.setText("Category name cannot exceed 60 characters.");
-            inlineErrorLabel.setVisible(true);
-            inlineErrorLabel.setManaged(true);
-            return;
-        }
+        TextField nameField = new TextField();
+        nameField.setPromptText("Category name");
+        nameField.getStyleClass().add("text-field");
 
-        saveBtn.setDisable(true);
-        saveBtn.setText("Saving...");
+        Label errorLabel = new Label();
+        errorLabel.getStyleClass().add("form-error");
+        errorLabel.setVisible(false);
+        errorLabel.setManaged(false);
 
-        AppExecutor.execute(() -> {
-            try {
-                Category created = productService.createCategory(name, "", currentUser);
-                Platform.runLater(() -> {
-                    saveBtn.setDisable(false);
-                    saveBtn.setText("Save");
-                    showInlineNewRow(false);
+        FormField field = new FormField("Category name", nameField, true, "Up to 60 characters");
+        dialog.setBody(field, errorLabel);
 
-                    CategoryItem newItem = new CategoryItem(created.getId(), created.getName());
-                    comboBox.getItems().add(newItem);
-                    comboBox.setValue(newItem);
+        Button cancelBtn = new Button("Cancel");
+        cancelBtn.getStyleClass().add("btn-dialog-cancel");
+        cancelBtn.setOnAction(e -> ViewNavigator.hideOverlayDialog());
 
-                    ViewNavigator.showToast("Category '" + created.getName() + "' created.", false);
-                    if (onCategoryCreatedCallback != null) {
-                        onCategoryCreatedCallback.accept(created);
-                    }
-                });
-            } catch (Exception ex) {
-                Platform.runLater(() -> {
-                    saveBtn.setDisable(false);
-                    saveBtn.setText("Save");
-                    inlineErrorLabel.setText(ex.getMessage());
-                    inlineErrorLabel.setVisible(true);
-                    inlineErrorLabel.setManaged(true);
-                });
+        Button createBtn = new Button("Create");
+        createBtn.getStyleClass().add("btn-dialog-confirm");
+
+        createBtn.setOnAction(e -> {
+            String name = nameField.getText() != null ? nameField.getText().trim() : "";
+            if (name.isEmpty()) {
+                errorLabel.setText("Category name is required.");
+                errorLabel.setVisible(true);
+                errorLabel.setManaged(true);
+                nameField.requestFocus();
+                return;
             }
+            if (name.length() > 60) {
+                errorLabel.setText("Category name cannot exceed 60 characters.");
+                errorLabel.setVisible(true);
+                errorLabel.setManaged(true);
+                nameField.requestFocus();
+                return;
+            }
+
+            createBtn.setDisable(true);
+            createBtn.setText("Creating...");
+            errorLabel.setVisible(false);
+            errorLabel.setManaged(false);
+
+            AppExecutor.execute(() -> {
+                try {
+                    Category created = productService.createCategory(name, "", currentUser);
+                    Platform.runLater(() -> {
+                        ViewNavigator.hideOverlayDialog();
+                        CategoryItem newItem = new CategoryItem(created.getId(), created.getName());
+                        comboBox.getItems().add(newItem);
+                        comboBox.setValue(newItem);
+                        ViewNavigator.showToast("Category '" + created.getName() + "' created.", false);
+                        if (onCategoryCreatedCallback != null) {
+                            onCategoryCreatedCallback.accept(created);
+                        }
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        createBtn.setDisable(false);
+                        createBtn.setText("Create");
+                        errorLabel.setText(ex.getMessage() != null ? ex.getMessage() : "Failed to create category");
+                        errorLabel.setVisible(true);
+                        errorLabel.setManaged(true);
+                    });
+                }
+            });
         });
+
+        dialog.setFooterButtons(cancelBtn, createBtn);
+        dialog.show();
+        Platform.runLater(nameField::requestFocus);
     }
 
     public CategoryItem getSelectedCategory() {

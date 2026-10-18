@@ -165,7 +165,12 @@ public class StoreTerminalView extends BorderPane implements Disposable {
 
         Button logoutBtn = new Button("Log out");
         logoutBtn.getStyleClass().add("btn-terminal-logout");
-        logoutBtn.setOnAction(e -> ViewNavigator.logout());
+        logoutBtn.setOnAction(e -> ViewNavigator.showConfirmDialog(
+                "Sign out?",
+                "You will need to sign in again to continue.",
+                "Sign out",
+                ViewNavigator::logout
+        ));
 
         userBox.getChildren().addAll(avatar, userDetails, logoutBtn);
 
