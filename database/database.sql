@@ -187,7 +187,7 @@ CREATE TABLE stock_movements (
     product_id INT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('IN', 'OUT', 'ADJUSTMENT')),
-    quantity INT NOT NULL CHECK (quantity > 0),
+    quantity INT NOT NULL CHECK (quantity >= 0),
     reason VARCHAR(40) NOT NULL CHECK (reason IN ('SOLD', 'USED', 'DAMAGED', 'EXPIRED', 'RESTOCK', 'AUDIT_CORRECTION', 'OTHER', 'UNDO', 'OPENING_STOCK')),
     previous_stock INT NOT NULL CHECK (previous_stock >= 0),
     new_stock INT NOT NULL CHECK (new_stock >= 0),

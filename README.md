@@ -922,6 +922,61 @@ AI_BASE_URL=
 
 ---
 
-# bAI — AI Business Assistant
+# Database Migration & Schema Updates
 
-AI-Powered Inventory & Retail Management Assistant built for Filipino retail store employees and business owners. Real-time stock tracking, automated par-level alerts, intelligent shift audits, and full-screen kiosk support.
+If upgrading an existing bAI database installation, execute the following SQL migration statements:
+
+```sql
+-- 1. Relax stock_movements quantity constraint to support zero-quantity edge cases (e.g., initial 0-count opening stock)
+ALTER TABLE stock_movements DROP CONSTRAINT IF EXISTS stock_movements_quantity_check;
+ALTER TABLE stock_movements ADD CONSTRAINT stock_movements_quantity_check CHECK (quantity >= 0);
+
+-- 2. Add AI usage tracking table for daily organization quotas (20 requests/day)
+CREATE TABLE IF NOT EXISTS ai_usage_tracking (
+    id SERIAL PRIMARY KEY,
+    organization_id INT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    usage_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    call_count INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (organization_id, usage_date)
+);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_org_date ON ai_usage_tracking(organization_id, usage_date);
+
+ALTER TABLE ai_usage_tracking ENABLE ROW LEVEL SECURITY;
+CREATE POLICY ai_usage_org_isolation ON ai_usage_tracking
+    FOR ALL
+    USING (organization_id = NULLIF(current_setting('app.current_organization_id', true), '')::integer)
+    WITH CHECK (organization_id = NULLIF(current_setting('app.current_organization_id', true), '')::integer);
+```
+
+---
+
+# Page 8: Reports & Export Engine
+
+The **Reports** view (`ReportsView.java`, `ReportService.java`, `ReportDao.java`) delivers enterprise reporting with multi-format export capabilities:
+
+### Report Types
+1. **Stock Movement Report**: Complete audit trail of stock in, stock out, damage deductions, and adjustments with reference numbers and user attribution. Filterable by date range (Today, 7 Days, 30 Days, 90 Days, All Time).
+2. **Inventory Valuation Report**: Live inventory breakdown with units on hand, unit cost, selling price, and calculated total inventory valuation.
+3. **Product Catalog Report**: Master list of all registered catalog items with SKUs, barcodes, categories, and active/archived status.
+4. **Low Stock Report**: Prioritized list of items currently at or below their reorder threshold (`stock_quantity <= low_stock_threshold`), ordered by stock deficit.
+
+### Export & Printing
+* **CSV Export**: Clean RFC 4180-compliant CSV generation with escaped quotes and commas, downloadable to any user-selected path.
+* **OpenPDF Landscape Export**: Formatted A4 landscape PDF document with corporate headers, zebra-striped data tables, column fitting, and timestamped internal confidentiality notices.
+* **Native Printing**: Off-thread JavaFX `PrinterJob` integration with page orientation and scaling checks.
+* **Role-Based Financial Privacy**: For staff with `EMPLOYEE` role, cost price and inventory cost valuations are automatically masked to `₱0.00` across all views and exported files.
+
+---
+
+# Page 9: AI Insights & Forecasting
+
+The **AI Insights** view (`AIInsightsView.java`) combines heuristic statistical algorithms with optional LLM reasoning:
+
+### Features & Capabilities
+1. **Executive KPI Cards**: Real-time display of Store Health Score, Restock Priorities count, Anomaly Alert count, and Daily AI API Quota remaining (out of 20).
+2. **Actual vs. Projected Demand**: Dual-series JavaFX LineChart charting past 7-day movement velocity against predictive next 7-day demand projections with strict integer axis ticks.
+3. **Restock Suggestions & Anomaly Badges**: Prioritized reorder list showing runout estimations, suggested order units, and supplier cost estimates. Anomaly detection flags unusual stock deductions or velocity spikes.
+4. **Ask bAI Copilot**: Real-time natural language query interface for inventory questions with interactive quick-prompt chips ("Which items are low on stock?", "What is our best-selling item?", "Show reorder suggestions") and a 200-character input safety guard.
+5. **Airtight Tenant & Privacy Scoping**: All questions are answered strictly within the verified organization context with zero cross-tenant visibility.

@@ -21,15 +21,21 @@ public class FormField extends VBox {
 
     public FormField(String labelText, Node inputControl, boolean required, String helperText) {
         super(4);
+        this.inputControl = inputControl;
         getStyleClass().add("form-field");
 
-        this.inputControl = inputControl;
+        javafx.scene.layout.HBox labelBox = new javafx.scene.layout.HBox(2);
+        labelBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
-        label = new Label(labelText + (required ? " *" : ""));
+        label = new Label(labelText);
         label.getStyleClass().add("form-label");
         label.setMinWidth(Label.USE_PREF_SIZE);
+        labelBox.getChildren().add(label);
+
         if (required) {
-            label.getStyleClass().add("form-label-required");
+            Label star = new Label("*");
+            star.getStyleClass().addAll("form-label", "form-label-required");
+            labelBox.getChildren().add(star);
         }
 
         errorLabel = new Label();
@@ -37,7 +43,7 @@ public class FormField extends VBox {
         errorLabel.setVisible(false);
         errorLabel.setManaged(false);
 
-        getChildren().addAll(label, inputControl, errorLabel);
+        getChildren().addAll(labelBox, inputControl, errorLabel);
 
         if (helperText != null && !helperText.isEmpty()) {
             helperLabel = new Label(helperText);
@@ -53,7 +59,9 @@ public class FormField extends VBox {
             errorLabel.setText(error);
             errorLabel.setVisible(true);
             errorLabel.setManaged(true);
-            inputControl.getStyleClass().add("input-error");
+            if (!inputControl.getStyleClass().contains("input-error")) {
+                inputControl.getStyleClass().add("input-error");
+            }
         } else {
             clearError();
         }
@@ -64,6 +72,14 @@ public class FormField extends VBox {
         errorLabel.setVisible(false);
         errorLabel.setManaged(false);
         inputControl.getStyleClass().remove("input-error");
+    }
+
+    public boolean hasError() {
+        return errorLabel.isVisible();
+    }
+
+    public void requestFocusOnInput() {
+        inputControl.requestFocus();
     }
 
     public Node getInputControl() {

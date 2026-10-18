@@ -508,11 +508,11 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         imgPreviewBox.setPrefSize(70, 70);
         imgPreviewBox.setMinSize(70, 70);
         imgPreviewBox.setMaxSize(70, 70);
-        imgPreviewBox.setStyle("-fx-background-color: #F1F5F9; -fx-background-radius: 8; -fx-border-color: -border-subtle; -fx-border-radius: 8;");
+        imgPreviewBox.getStyleClass().add("item-thumb-box");
 
         SVGPath defaultBoxIcon = new SVGPath();
         defaultBoxIcon.setContent(SVG_BOX);
-        defaultBoxIcon.setStyle("-fx-fill: #94A3B8;");
+        defaultBoxIcon.getStyleClass().add("sidebar-item-icon");
         imgPreviewBox.getChildren().add(defaultBoxIcon);
 
         ImageView previewImgView = new ImageView();
@@ -527,19 +527,26 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         uploadImgBtn.getStyleClass().add("btn-dialog-cancel");
         uploadImgBtn.setMinWidth(Button.USE_PREF_SIZE);
 
-        Label imgHint = new Label("PNG/JPG, max 5 MB");
-        imgHint.setStyle("-fx-font-size: 11px; -fx-text-fill: -text-muted;");
+        Label imgHint = new Label("PNG/JPG/GIF, max 5 MB");
+        imgHint.getStyleClass().add("form-helper");
+
+        FormField imgField = new FormField("Product picture", new HBox(14, imgPreviewBox, imgDetails), true);
 
         uploadImgBtn.setOnAction(e -> {
             FileChooser chooser = new FileChooser();
             chooser.setTitle("Select Product Image");
-            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Image Files (*.png, *.jpg, *.jpeg, *.webp)", "*.png", "*.jpg", "*.jpeg", "*.webp"));
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Image Files (*.png, *.jpg, *.jpeg, *.gif)", "*.png", "*.jpg", "*.jpeg", "*.gif"));
             File file = chooser.showOpenDialog(ViewNavigator.getPrimaryStage());
             if (file != null) {
                 if (file.length() > 5 * 1024 * 1024) {
-                    ViewNavigator.showToast("Image file size exceeds 5 MB limit.", true);
+                    imgField.setError("Image file size exceeds 5 MB limit.");
                     return;
                 }
+                if (!ProductService.isValidProductImage(file.getAbsolutePath())) {
+                    imgField.setError("Selected file is not a valid decodable image.");
+                    return;
+                }
+                imgField.clearError();
                 selectedImagePath.set(file.getAbsolutePath());
                 previewImgView.setImage(new Image(file.toURI().toString(), 70, 70, true, true));
                 imgPreviewBox.getChildren().setAll(previewImgView);
@@ -548,9 +555,6 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         });
 
         imgDetails.getChildren().addAll(uploadImgBtn, imgHint);
-        HBox imgRow = new HBox(14, imgPreviewBox, imgDetails);
-        imgRow.setAlignment(Pos.CENTER_LEFT);
-        FormField imgField = new FormField("Product picture", imgRow);
 
         TextField nameField = new TextField();
         nameField.setPromptText("e.g. Barako Coffee Beans 1kg");
@@ -559,7 +563,7 @@ public class ProductCatalogView extends BorderPane implements Disposable {
 
         CategorySelector categorySelector = new CategorySelector(CategorySelector.Mode.FORM);
         categorySelector.setMaxWidth(Double.MAX_VALUE);
-        FormField categoryFormField = new FormField("Category", categorySelector, false);
+        FormField categoryFormField = new FormField("Category", categorySelector, true);
 
         ComboBox<String> unitBox = new ComboBox<>();
         unitBox.getItems().addAll("pcs", "bag", "box", "keg", "tin", "carton", "sleeve", "pack", "kg", "g", "L");
@@ -589,29 +593,66 @@ public class ProductCatalogView extends BorderPane implements Disposable {
 
         TextField costField = new TextField("0.00");
         costField.setMaxWidth(Double.MAX_VALUE);
-        FormField costFormField = new FormField("Cost price (₱)", costField, false);
+        FormField costFormField = new FormField("Cost price (₱)", costField, true);
         HBox.setHgrow(costFormField, Priority.ALWAYS);
 
-        TextField skuField = new TextField(generateRandomSku());
+        // Warning line for selling price < cost price
+        Label priceWarningLabel = new Label("⚠️ Warning: Selling price is lower than cost price (selling at a loss).");
+        priceWarningLabel.getStyleClass().add("form-warning-line");
+        priceWarningLabel.setVisible(false);
+        priceWarningLabel.setManaged(false);
+
+        Runnable checkPriceWarning = () -> {
+            try {
+                BigDecimal sp = new BigDecimal(priceField.getText().trim());
+                BigDecimal cp = new BigDecimal(costField.getText().trim());
+                boolean isLoss = sp.compareTo(cp) < 0 && cp.compareTo(BigDecimal.ZERO) > 0;
+                priceWarningLabel.setVisible(isLoss);
+                priceWarningLabel.setManaged(isLoss);
+            } catch (Exception ignored) {
+                priceWarningLabel.setVisible(false);
+                priceWarningLabel.setManaged(false);
+            }
+        };
+        priceField.textProperty().addListener((obs, o, n) -> checkPriceWarning.run());
+        costField.textProperty().addListener((obs, o, n) -> checkPriceWarning.run());
+
+        TextField skuField = new TextField();
+        skuField.setPromptText("e.g. BEV-102948");
         skuField.setMaxWidth(Double.MAX_VALUE);
-        Button autoSkuBtn = new Button("Auto");
-        autoSkuBtn.getStyleClass().add("btn-dialog-cancel");
-        autoSkuBtn.setMinWidth(Button.USE_PREF_SIZE);
-        autoSkuBtn.setOnAction(e -> skuField.setText(generateRandomSku()));
-        HBox skuInputRow = new HBox(6, skuField, autoSkuBtn);
+        Button generateSkuBtn = new Button("Generate");
+        generateSkuBtn.getStyleClass().add("btn-dialog-cancel");
+        generateSkuBtn.setMinWidth(Button.USE_PREF_SIZE);
+        generateSkuBtn.setOnAction(e -> {
+            CategorySelector.CategoryItem cat = categorySelector.getSelectedCategory();
+            String catName = cat != null ? cat.name() : null;
+            skuField.setText(productService.generateUniqueSku(currentUser, catName));
+        });
+        HBox skuInputRow = new HBox(6, skuField, generateSkuBtn);
         HBox.setHgrow(skuField, Priority.ALWAYS);
+        FormField skuFormField = new FormField("SKU", skuInputRow, true);
+        HBox.setHgrow(skuFormField, Priority.ALWAYS);
 
         TextField barcodeField = new TextField();
-        barcodeField.setPromptText("Optional Barcode / UPC");
+        barcodeField.setPromptText("Barcode / UPC (4-64 digits)");
         barcodeField.setMaxWidth(Double.MAX_VALUE);
+        Button generateBarcodeBtn = new Button("Generate");
+        generateBarcodeBtn.getStyleClass().add("btn-dialog-cancel");
+        generateBarcodeBtn.setMinWidth(Button.USE_PREF_SIZE);
+        generateBarcodeBtn.setOnAction(e -> barcodeField.setText(productService.generateUniqueBarcode(currentUser)));
+        HBox barcodeInputRow = new HBox(6, barcodeField, generateBarcodeBtn);
+        HBox.setHgrow(barcodeField, Priority.ALWAYS);
+        FormField barcodeFormField = new FormField("Barcode", barcodeInputRow, true);
+        HBox.setHgrow(barcodeFormField, Priority.ALWAYS);
 
-        VBox skuBarcodeBox = new VBox(6, skuInputRow, barcodeField);
-        FormField skuBarcodeFormField = new FormField("SKU / Barcode", skuBarcodeBox, true);
-        HBox.setHgrow(skuBarcodeFormField, Priority.ALWAYS);
+        HBox costSkuRow = new HBox(12, costFormField, skuFormField);
+        HBox barcodeRow = new HBox(12, barcodeFormField);
 
-        HBox costSkuRow = new HBox(12, costFormField, skuBarcodeFormField);
+        // Auto-generate initial SKU & Barcode
+        skuField.setText(productService.generateUniqueSku(currentUser, null));
+        barcodeField.setText(productService.generateUniqueBarcode(currentUser));
 
-        dialog.addBody(imgField, nameFormField, categoryFormField, unitThresholdRow, qtyPriceRow, costSkuRow);
+        dialog.addBody(imgField, nameFormField, categoryFormField, unitThresholdRow, qtyPriceRow, priceWarningLabel, costSkuRow, barcodeRow);
 
         Button cancelBtn = new Button("Cancel");
         cancelBtn.getStyleClass().add("btn-dialog-cancel");
@@ -620,66 +661,195 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         Button saveBtn = new Button("Save Product");
         saveBtn.getStyleClass().add("btn-dialog-confirm");
         saveBtn.setOnAction(e -> {
+            // Clear previous errors
+            imgField.clearError();
+            nameFormField.clearError();
+            categoryFormField.clearError();
+            unitFormField.clearError();
+            qtyFormField.clearError();
+            priceFormField.clearError();
+            costFormField.clearError();
+            skuFormField.clearError();
+            barcodeFormField.clearError();
+            thresholdFormField.clearError();
+
+            boolean hasError = false;
+            FormField firstInvalid = null;
+
+            if (selectedImagePath.get() == null || selectedImagePath.get().trim().isEmpty()) {
+                imgField.setError("Product picture is required.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = imgField;
+            }
+
             String name = nameField.getText() != null ? nameField.getText().trim() : "";
             if (name.isEmpty()) {
                 nameFormField.setError("Product name is required.");
-                return;
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = nameFormField;
+            } else if (name.length() > 120) {
+                nameFormField.setError("Product name cannot exceed 120 characters.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = nameFormField;
             }
-            nameFormField.clearError();
 
             Integer catId = categorySelector.getSelectedCategoryId();
-            categoryFormField.clearError();
+            if (catId == null || catId <= 0) {
+                categoryFormField.setError("Category is required.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = categoryFormField;
+            }
+
+            String unit = unitBox.getValue();
+            if (unit == null || unit.trim().isEmpty()) {
+                unitFormField.setError("Unit is required.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = unitFormField;
+            }
+
+            int qty = 0;
+            try {
+                qty = Integer.parseInt(qtyField.getText().trim());
+                if (qty < 0) {
+                    qtyFormField.setError("Starting quantity must be 0 or greater.");
+                    hasError = true;
+                    if (firstInvalid == null) firstInvalid = qtyFormField;
+                }
+            } catch (Exception ex) {
+                qtyFormField.setError("Starting quantity must be a whole number.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = qtyFormField;
+            }
+
+            int threshold = 10;
+            try {
+                threshold = Integer.parseInt(thresholdField.getText().trim());
+                if (threshold < 0) {
+                    thresholdFormField.setError("Low-stock level must be 0 or greater.");
+                    hasError = true;
+                    if (firstInvalid == null) firstInvalid = thresholdFormField;
+                }
+            } catch (Exception ex) {
+                thresholdFormField.setError("Low-stock level must be a whole number.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = thresholdFormField;
+            }
+
+            BigDecimal price = null;
+            try {
+                price = new BigDecimal(priceField.getText().trim());
+                if (price.compareTo(BigDecimal.ZERO) < 0) {
+                    priceFormField.setError("Selling price must be 0 or greater.");
+                    hasError = true;
+                    if (firstInvalid == null) firstInvalid = priceFormField;
+                } else if (price.scale() > 2) {
+                    priceFormField.setError("Selling price cannot have more than 2 decimal places.");
+                    hasError = true;
+                    if (firstInvalid == null) firstInvalid = priceFormField;
+                }
+            } catch (Exception ex) {
+                priceFormField.setError("Selling price must be a valid number.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = priceFormField;
+            }
+
+            BigDecimal cost = null;
+            try {
+                cost = new BigDecimal(costField.getText().trim());
+                if (cost.compareTo(BigDecimal.ZERO) < 0) {
+                    costFormField.setError("Cost price must be 0 or greater.");
+                    hasError = true;
+                    if (firstInvalid == null) firstInvalid = costFormField;
+                } else if (cost.scale() > 2) {
+                    costFormField.setError("Cost price cannot have more than 2 decimal places.");
+                    hasError = true;
+                    if (firstInvalid == null) firstInvalid = costFormField;
+                }
+            } catch (Exception ex) {
+                costFormField.setError("Cost price must be a valid number.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = costFormField;
+            }
 
             String sku = skuField.getText() != null ? skuField.getText().trim() : "";
             if (sku.isEmpty()) {
-                skuBarcodeFormField.setError("SKU is required.");
+                skuFormField.setError("SKU is required.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = skuFormField;
+            } else if (sku.length() > 64) {
+                skuFormField.setError("SKU cannot exceed 64 characters.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = skuFormField;
+            }
+
+            String barcode = barcodeField.getText() != null ? barcodeField.getText().trim() : "";
+            if (barcode.isEmpty()) {
+                barcodeFormField.setError("Barcode is required.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = barcodeFormField;
+            } else if (barcode.length() < 4 || barcode.length() > 64) {
+                barcodeFormField.setError("Barcode must be between 4 and 64 characters.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = barcodeFormField;
+            }
+
+            if (hasError && firstInvalid != null) {
+                firstInvalid.requestFocusOnInput();
                 return;
             }
-            skuBarcodeFormField.clearError();
 
-            try {
-                BigDecimal cost = new BigDecimal(costField.getText().trim());
-                BigDecimal price = new BigDecimal(priceField.getText().trim());
-                int qty = Integer.parseInt(qtyField.getText().trim());
-                int threshold = Integer.parseInt(thresholdField.getText().trim());
+            Product p = new Product();
+            p.setName(name);
+            p.setCategoryId(catId);
+            p.setUnit(unit);
+            p.setSku(sku);
+            p.setBarcode(barcode);
+            p.setCostPrice(cost);
+            p.setSellingPrice(price);
+            p.setStockQuantity(qty);
+            p.setLowStockThreshold(threshold);
+            p.setImagePath(selectedImagePath.get());
 
-                if (cost.compareTo(BigDecimal.ZERO) < 0 || price.compareTo(BigDecimal.ZERO) < 0 || qty < 0 || threshold < 0) {
-                    ViewNavigator.showToast("Prices, quantities, and thresholds must be non-negative.", true);
-                    return;
+            saveBtn.setDisable(true);
+            saveBtn.setText("Saving...");
+            AppExecutor.execute(() -> {
+                try {
+                    productService.createProduct(p, currentUser);
+                    Platform.runLater(() -> {
+                        ViewNavigator.hideOverlayDialog();
+                        ViewNavigator.showToast("Product '" + name + "' added successfully.", false);
+                        loadInitialData();
+                    });
+                } catch (ProductService.ValidationException ve) {
+                    Platform.runLater(() -> {
+                        saveBtn.setDisable(false);
+                        saveBtn.setText("Save Product");
+                        FormField firstErr = null;
+                        for (ProductService.FieldError fe : ve.getErrors()) {
+                            switch (fe.field()) {
+                                case "picture" -> { imgField.setError(fe.message()); if (firstErr == null) firstErr = imgField; }
+                                case "name" -> { nameFormField.setError(fe.message()); if (firstErr == null) firstErr = nameFormField; }
+                                case "category" -> { categoryFormField.setError(fe.message()); if (firstErr == null) firstErr = categoryFormField; }
+                                case "unit" -> { unitFormField.setError(fe.message()); if (firstErr == null) firstErr = unitFormField; }
+                                case "startingQuantity" -> { qtyFormField.setError(fe.message()); if (firstErr == null) firstErr = qtyFormField; }
+                                case "sellingPrice" -> { priceFormField.setError(fe.message()); if (firstErr == null) firstErr = priceFormField; }
+                                case "costPrice" -> { costFormField.setError(fe.message()); if (firstErr == null) firstErr = costFormField; }
+                                case "sku" -> { skuFormField.setError(fe.message()); if (firstErr == null) firstErr = skuFormField; }
+                                case "barcode" -> { barcodeFormField.setError(fe.message()); if (firstErr == null) firstErr = barcodeFormField; }
+                                case "lowStockThreshold" -> { thresholdFormField.setError(fe.message()); if (firstErr == null) firstErr = thresholdFormField; }
+                                default -> ViewNavigator.showToast(fe.message(), true);
+                            }
+                        }
+                        if (firstErr != null) firstErr.requestFocusOnInput();
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        saveBtn.setDisable(false);
+                        saveBtn.setText("Save Product");
+                        ViewNavigator.showToast("Unable to save product. Please check your inputs and try again.", true);
+                    });
                 }
-
-                Product p = new Product();
-                p.setName(name);
-                p.setCategoryId(catId);
-                p.setUnit(unitBox.getValue());
-                p.setSku(sku);
-                p.setBarcode(barcodeField.getText().trim());
-                p.setCostPrice(cost);
-                p.setSellingPrice(price);
-                p.setStockQuantity(qty);
-                p.setLowStockThreshold(threshold);
-                p.setImagePath(selectedImagePath.get());
-
-                saveBtn.setDisable(true);
-                AppExecutor.execute(() -> {
-                    try {
-                        productService.createProduct(p, currentUser);
-                        Platform.runLater(() -> {
-                            ViewNavigator.hideOverlayDialog();
-                            ViewNavigator.showToast("Product '" + name + "' added successfully.", false);
-                            loadInitialData();
-                        });
-                    } catch (Exception ex) {
-                        Platform.runLater(() -> {
-                            saveBtn.setDisable(false);
-                            ViewNavigator.showToast(ex.getMessage() != null ? ex.getMessage() : "Failed to create product.", true);
-                        });
-                    }
-                });
-
-            } catch (NumberFormatException nfe) {
-                ViewNavigator.showToast("Invalid number format for price, quantity, or threshold.", true);
-            }
+            });
         });
 
         dialog.setFooterButtons(cancelBtn, saveBtn);
@@ -694,7 +864,7 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         imgPreviewBox.setPrefSize(70, 70);
         imgPreviewBox.setMinSize(70, 70);
         imgPreviewBox.setMaxSize(70, 70);
-        imgPreviewBox.setStyle("-fx-background-color: #F1F5F9; -fx-background-radius: 8; -fx-border-color: -border-subtle; -fx-border-radius: 8;");
+        imgPreviewBox.getStyleClass().add("item-thumb-box");
 
         ImageView previewImgView = new ImageView();
         previewImgView.setFitWidth(66);
@@ -709,13 +879,13 @@ public class ProductCatalogView extends BorderPane implements Disposable {
             } else {
                 SVGPath defaultBoxIcon = new SVGPath();
                 defaultBoxIcon.setContent(SVG_BOX);
-                defaultBoxIcon.setStyle("-fx-fill: #94A3B8;");
+                defaultBoxIcon.getStyleClass().add("sidebar-item-icon");
                 imgPreviewBox.getChildren().add(defaultBoxIcon);
             }
         } else {
             SVGPath defaultBoxIcon = new SVGPath();
             defaultBoxIcon.setContent(SVG_BOX);
-            defaultBoxIcon.setStyle("-fx-fill: #94A3B8;");
+            defaultBoxIcon.getStyleClass().add("sidebar-item-icon");
             imgPreviewBox.getChildren().add(defaultBoxIcon);
         }
 
@@ -726,20 +896,27 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         uploadImgBtn.getStyleClass().add("btn-dialog-cancel");
         uploadImgBtn.setMinWidth(Button.USE_PREF_SIZE);
 
-        String initialFileName = product.getImagePath() != null ? new File(product.getImagePath()).getName() : "PNG/JPG, max 5 MB";
+        String initialFileName = product.getImagePath() != null ? new File(product.getImagePath()).getName() : "PNG/JPG/GIF, max 5 MB";
         Label imgHint = new Label(initialFileName);
-        imgHint.setStyle("-fx-font-size: 11px; -fx-text-fill: -text-muted;");
+        imgHint.getStyleClass().add("form-helper");
+
+        FormField imgField = new FormField("Product picture", new HBox(14, imgPreviewBox, imgDetails), true);
 
         uploadImgBtn.setOnAction(e -> {
             FileChooser chooser = new FileChooser();
             chooser.setTitle("Select Product Image");
-            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Image Files (*.png, *.jpg, *.jpeg, *.webp)", "*.png", "*.jpg", "*.jpeg", "*.webp"));
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Image Files (*.png, *.jpg, *.jpeg, *.gif)", "*.png", "*.jpg", "*.jpeg", "*.gif"));
             File file = chooser.showOpenDialog(ViewNavigator.getPrimaryStage());
             if (file != null) {
                 if (file.length() > 5 * 1024 * 1024) {
-                    ViewNavigator.showToast("Image file size exceeds 5 MB limit.", true);
+                    imgField.setError("Image file size exceeds 5 MB limit.");
                     return;
                 }
+                if (!ProductService.isValidProductImage(file.getAbsolutePath())) {
+                    imgField.setError("Selected file is not a valid decodable image.");
+                    return;
+                }
+                imgField.clearError();
                 selectedImagePath.set(file.getAbsolutePath());
                 previewImgView.setImage(new Image(file.toURI().toString(), 70, 70, true, true));
                 imgPreviewBox.getChildren().setAll(previewImgView);
@@ -748,9 +925,6 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         });
 
         imgDetails.getChildren().addAll(uploadImgBtn, imgHint);
-        HBox imgRow = new HBox(14, imgPreviewBox, imgDetails);
-        imgRow.setAlignment(Pos.CENTER_LEFT);
-        FormField imgField = new FormField("Product picture", imgRow);
 
         TextField nameField = new TextField(product.getName());
         nameField.setMaxWidth(Double.MAX_VALUE);
@@ -759,7 +933,7 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         CategorySelector categorySelector = new CategorySelector(CategorySelector.Mode.FORM);
         categorySelector.setMaxWidth(Double.MAX_VALUE);
         categorySelector.setSelectedCategoryId(product.getCategoryId());
-        FormField categoryFormField = new FormField("Category", categorySelector, false);
+        FormField categoryFormField = new FormField("Category", categorySelector, true);
 
         ComboBox<String> unitBox = new ComboBox<>();
         unitBox.getItems().addAll("pcs", "bag", "box", "keg", "tin", "carton", "sleeve", "pack", "kg", "g", "L");
@@ -780,7 +954,7 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         stockField.setEditable(false);
         stockField.setDisable(true);
         stockField.setMaxWidth(Double.MAX_VALUE);
-        FormField stockFormField = new FormField("Current stock", stockField, false, "Stock adjusted via Terminal or Stock In/Out");
+        FormField stockFormField = new FormField("Starting quantity", stockField, true, "Starting quantity is locked after creation");
         HBox.setHgrow(stockFormField, Priority.ALWAYS);
 
         TextField priceField = new TextField(product.getSellingPrice() != null ? product.getSellingPrice().toPlainString() : "0.00");
@@ -792,25 +966,61 @@ public class ProductCatalogView extends BorderPane implements Disposable {
 
         TextField costField = new TextField(product.getCostPrice() != null ? product.getCostPrice().toPlainString() : "0.00");
         costField.setMaxWidth(Double.MAX_VALUE);
-        FormField costFormField = new FormField("Cost price (₱)", costField, false);
+        FormField costFormField = new FormField("Cost price (₱)", costField, true);
         HBox.setHgrow(costFormField, Priority.ALWAYS);
 
+        // Warning line for selling price < cost price
+        Label priceWarningLabel = new Label("⚠️ Warning: Selling price is lower than cost price (selling at a loss).");
+        priceWarningLabel.getStyleClass().add("form-warning-line");
+        priceWarningLabel.setVisible(false);
+        priceWarningLabel.setManaged(false);
+
+        Runnable checkPriceWarning = () -> {
+            try {
+                BigDecimal sp = new BigDecimal(priceField.getText().trim());
+                BigDecimal cp = new BigDecimal(costField.getText().trim());
+                boolean isLoss = sp.compareTo(cp) < 0 && cp.compareTo(BigDecimal.ZERO) > 0;
+                priceWarningLabel.setVisible(isLoss);
+                priceWarningLabel.setManaged(isLoss);
+            } catch (Exception ignored) {
+                priceWarningLabel.setVisible(false);
+                priceWarningLabel.setManaged(false);
+            }
+        };
+        priceField.textProperty().addListener((obs, o, n) -> checkPriceWarning.run());
+        costField.textProperty().addListener((obs, o, n) -> checkPriceWarning.run());
+        checkPriceWarning.run();
+
         TextField skuField = new TextField(product.getSku());
-        skuField.setEditable(false);
-        skuField.setDisable(true);
         skuField.setMaxWidth(Double.MAX_VALUE);
+        Button generateSkuBtn = new Button("Generate");
+        generateSkuBtn.getStyleClass().add("btn-dialog-cancel");
+        generateSkuBtn.setMinWidth(Button.USE_PREF_SIZE);
+        generateSkuBtn.setOnAction(e -> {
+            CategorySelector.CategoryItem cat = categorySelector.getSelectedCategory();
+            String catName = cat != null ? cat.name() : null;
+            skuField.setText(productService.generateUniqueSku(currentUser, catName));
+        });
+        HBox skuInputRow = new HBox(6, skuField, generateSkuBtn);
+        HBox.setHgrow(skuField, Priority.ALWAYS);
+        FormField skuFormField = new FormField("SKU", skuInputRow, true);
+        HBox.setHgrow(skuFormField, Priority.ALWAYS);
 
         TextField barcodeField = new TextField(product.getBarcode() != null ? product.getBarcode() : "");
-        barcodeField.setPromptText("Optional Barcode / UPC");
         barcodeField.setMaxWidth(Double.MAX_VALUE);
+        Button generateBarcodeBtn = new Button("Generate");
+        generateBarcodeBtn.getStyleClass().add("btn-dialog-cancel");
+        generateBarcodeBtn.setMinWidth(Button.USE_PREF_SIZE);
+        generateBarcodeBtn.setOnAction(e -> barcodeField.setText(productService.generateUniqueBarcode(currentUser)));
+        HBox barcodeInputRow = new HBox(6, barcodeField, generateBarcodeBtn);
+        HBox.setHgrow(barcodeField, Priority.ALWAYS);
+        FormField barcodeFormField = new FormField("Barcode", barcodeInputRow, true);
+        HBox.setHgrow(barcodeFormField, Priority.ALWAYS);
 
-        VBox skuBarcodeBox = new VBox(6, skuField, barcodeField);
-        FormField skuBarcodeFormField = new FormField("SKU / Barcode", skuBarcodeBox, false);
-        HBox.setHgrow(skuBarcodeFormField, Priority.ALWAYS);
+        HBox costSkuRow = new HBox(12, costFormField, skuFormField);
+        HBox barcodeRow = new HBox(12, barcodeFormField);
 
-        HBox costSkuRow = new HBox(12, costFormField, skuBarcodeFormField);
-
-        dialog.addBody(imgField, nameFormField, categoryFormField, unitThresholdRow, stockPriceRow, costSkuRow);
+        dialog.addBody(imgField, nameFormField, categoryFormField, unitThresholdRow, stockPriceRow, priceWarningLabel, costSkuRow, barcodeRow);
 
         Button cancelBtn = new Button("Cancel");
         cancelBtn.getStyleClass().add("btn-dialog-cancel");
@@ -819,55 +1029,177 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         Button saveBtn = new Button("Update Product");
         saveBtn.getStyleClass().add("btn-dialog-confirm");
         saveBtn.setOnAction(e -> {
+            // Clear previous errors
+            imgField.clearError();
+            nameFormField.clearError();
+            categoryFormField.clearError();
+            unitFormField.clearError();
+            priceFormField.clearError();
+            costFormField.clearError();
+            skuFormField.clearError();
+            barcodeFormField.clearError();
+            thresholdFormField.clearError();
+
+            boolean hasError = false;
+            FormField firstInvalid = null;
+
+            if (selectedImagePath.get() == null || selectedImagePath.get().trim().isEmpty()) {
+                imgField.setError("Product picture is required.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = imgField;
+            }
+
             String name = nameField.getText() != null ? nameField.getText().trim() : "";
             if (name.isEmpty()) {
-                nameFormField.setError("Product name cannot be empty.");
-                return;
+                nameFormField.setError("Product name is required.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = nameFormField;
+            } else if (name.length() > 120) {
+                nameFormField.setError("Product name cannot exceed 120 characters.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = nameFormField;
             }
-            nameFormField.clearError();
 
             Integer catId = categorySelector.getSelectedCategoryId();
-            categoryFormField.clearError();
-
-            try {
-                BigDecimal cost = new BigDecimal(costField.getText().trim());
-                BigDecimal price = new BigDecimal(priceField.getText().trim());
-                int threshold = Integer.parseInt(thresholdField.getText().trim());
-
-                if (cost.compareTo(BigDecimal.ZERO) < 0 || price.compareTo(BigDecimal.ZERO) < 0 || threshold < 0) {
-                    ViewNavigator.showToast("Prices and thresholds must be non-negative.", true);
-                    return;
-                }
-
-                product.setName(name);
-                product.setCategoryId(catId);
-                product.setUnit(unitBox.getValue());
-                product.setBarcode(barcodeField.getText().trim());
-                product.setCostPrice(cost);
-                product.setSellingPrice(price);
-                product.setLowStockThreshold(threshold);
-                product.setImagePath(selectedImagePath.get());
-
-                saveBtn.setDisable(true);
-                AppExecutor.execute(() -> {
-                    try {
-                        productService.updateProduct(product, currentUser);
-                        Platform.runLater(() -> {
-                            ViewNavigator.hideOverlayDialog();
-                            ViewNavigator.showToast("Product '" + name + "' updated.", false);
-                            loadInitialData();
-                        });
-                    } catch (Exception ex) {
-                        Platform.runLater(() -> {
-                            saveBtn.setDisable(false);
-                            ViewNavigator.showToast(ex.getMessage() != null ? ex.getMessage() : "Failed to update product.", true);
-                        });
-                    }
-                });
-
-            } catch (NumberFormatException nfe) {
-                ViewNavigator.showToast("Invalid number format for price or threshold.", true);
+            if (catId == null || catId <= 0) {
+                categoryFormField.setError("Category is required.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = categoryFormField;
             }
+
+            String unit = unitBox.getValue();
+            if (unit == null || unit.trim().isEmpty()) {
+                unitFormField.setError("Unit is required.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = unitFormField;
+            }
+
+            int threshold = 10;
+            try {
+                threshold = Integer.parseInt(thresholdField.getText().trim());
+                if (threshold < 0) {
+                    thresholdFormField.setError("Low-stock level must be 0 or greater.");
+                    hasError = true;
+                    if (firstInvalid == null) firstInvalid = thresholdFormField;
+                }
+            } catch (Exception ex) {
+                thresholdFormField.setError("Low-stock level must be a whole number.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = thresholdFormField;
+            }
+
+            BigDecimal price = null;
+            try {
+                price = new BigDecimal(priceField.getText().trim());
+                if (price.compareTo(BigDecimal.ZERO) < 0) {
+                    priceFormField.setError("Selling price must be 0 or greater.");
+                    hasError = true;
+                    if (firstInvalid == null) firstInvalid = priceFormField;
+                } else if (price.scale() > 2) {
+                    priceFormField.setError("Selling price cannot have more than 2 decimal places.");
+                    hasError = true;
+                    if (firstInvalid == null) firstInvalid = priceFormField;
+                }
+            } catch (Exception ex) {
+                priceFormField.setError("Selling price must be a valid number.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = priceFormField;
+            }
+
+            BigDecimal cost = null;
+            try {
+                cost = new BigDecimal(costField.getText().trim());
+                if (cost.compareTo(BigDecimal.ZERO) < 0) {
+                    costFormField.setError("Cost price must be 0 or greater.");
+                    hasError = true;
+                    if (firstInvalid == null) firstInvalid = costFormField;
+                } else if (cost.scale() > 2) {
+                    costFormField.setError("Cost price cannot have more than 2 decimal places.");
+                    hasError = true;
+                    if (firstInvalid == null) firstInvalid = costFormField;
+                }
+            } catch (Exception ex) {
+                costFormField.setError("Cost price must be a valid number.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = costFormField;
+            }
+
+            String sku = skuField.getText() != null ? skuField.getText().trim() : "";
+            if (sku.isEmpty()) {
+                skuFormField.setError("SKU is required.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = skuFormField;
+            } else if (sku.length() > 64) {
+                skuFormField.setError("SKU cannot exceed 64 characters.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = skuFormField;
+            }
+
+            String barcode = barcodeField.getText() != null ? barcodeField.getText().trim() : "";
+            if (barcode.isEmpty()) {
+                barcodeFormField.setError("Barcode is required.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = barcodeFormField;
+            } else if (barcode.length() < 4 || barcode.length() > 64) {
+                barcodeFormField.setError("Barcode must be between 4 and 64 characters.");
+                hasError = true;
+                if (firstInvalid == null) firstInvalid = barcodeFormField;
+            }
+
+            if (hasError && firstInvalid != null) {
+                firstInvalid.requestFocusOnInput();
+                return;
+            }
+
+            product.setName(name);
+            product.setCategoryId(catId);
+            product.setUnit(unit);
+            product.setSku(sku);
+            product.setBarcode(barcode);
+            product.setCostPrice(cost);
+            product.setSellingPrice(price);
+            product.setLowStockThreshold(threshold);
+            product.setImagePath(selectedImagePath.get());
+
+            saveBtn.setDisable(true);
+            saveBtn.setText("Updating...");
+            AppExecutor.execute(() -> {
+                try {
+                    productService.updateProduct(product, currentUser);
+                    Platform.runLater(() -> {
+                        ViewNavigator.hideOverlayDialog();
+                        ViewNavigator.showToast("Product '" + name + "' updated.", false);
+                        loadInitialData();
+                    });
+                } catch (ProductService.ValidationException ve) {
+                    Platform.runLater(() -> {
+                        saveBtn.setDisable(false);
+                        saveBtn.setText("Update Product");
+                        FormField firstErr = null;
+                        for (ProductService.FieldError fe : ve.getErrors()) {
+                            switch (fe.field()) {
+                                case "picture" -> { imgField.setError(fe.message()); if (firstErr == null) firstErr = imgField; }
+                                case "name" -> { nameFormField.setError(fe.message()); if (firstErr == null) firstErr = nameFormField; }
+                                case "category" -> { categoryFormField.setError(fe.message()); if (firstErr == null) firstErr = categoryFormField; }
+                                case "unit" -> { unitFormField.setError(fe.message()); if (firstErr == null) firstErr = unitFormField; }
+                                case "sellingPrice" -> { priceFormField.setError(fe.message()); if (firstErr == null) firstErr = priceFormField; }
+                                case "costPrice" -> { costFormField.setError(fe.message()); if (firstErr == null) firstErr = costFormField; }
+                                case "sku" -> { skuFormField.setError(fe.message()); if (firstErr == null) firstErr = skuFormField; }
+                                case "barcode" -> { barcodeFormField.setError(fe.message()); if (firstErr == null) firstErr = barcodeFormField; }
+                                case "lowStockThreshold" -> { thresholdFormField.setError(fe.message()); if (firstErr == null) firstErr = thresholdFormField; }
+                                default -> ViewNavigator.showToast(fe.message(), true);
+                            }
+                        }
+                        if (firstErr != null) firstErr.requestFocusOnInput();
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        saveBtn.setDisable(false);
+                        saveBtn.setText("Update Product");
+                        ViewNavigator.showToast("Unable to update product. Please check your inputs and try again.", true);
+                    });
+                }
+            });
         });
 
         dialog.setFooterButtons(cancelBtn, saveBtn);

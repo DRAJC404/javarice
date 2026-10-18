@@ -284,6 +284,13 @@ public class LoginView extends BorderPane implements Disposable {
         signInButton.setMaxWidth(Double.MAX_VALUE);
         signInButton.setOnAction(e -> handleLogin());
 
+        Button joinButton = new Button("Join with a code");
+        joinButton.getStyleClass().add("btn-secondary");
+        joinButton.setMaxWidth(Double.MAX_VALUE);
+        joinButton.setOnAction(e -> {
+            if (onNavigateJoin != null) onNavigateJoin.run();
+        });
+
         VBox footerBox = new VBox(6);
         footerBox.getStyleClass().add("auth-footer");
         footerBox.setAlignment(Pos.CENTER);
@@ -299,18 +306,7 @@ public class LoginView extends BorderPane implements Disposable {
         });
         ownerRow.getChildren().addAll(ownerLabel, ownerLink);
 
-        HBox joinRow = new HBox(4);
-        joinRow.setAlignment(Pos.CENTER);
-        Label staffLabel = new Label("Staff member?");
-        staffLabel.getStyleClass().add("auth-footer-text");
-        Hyperlink joinLink = new Hyperlink("Join with a code");
-        joinLink.getStyleClass().add("auth-link");
-        joinLink.setOnAction(e -> {
-            if (onNavigateJoin != null) onNavigateJoin.run();
-        });
-        joinRow.getChildren().addAll(staffLabel, joinLink);
-
-        footerBox.getChildren().addAll(ownerRow, joinRow);
+        footerBox.getChildren().add(ownerRow);
 
         VBox emailGroup = new VBox(4, emailLabel, emailField);
         VBox passwordGroup = new VBox(4, passwordLabel, passwordContainer);
@@ -323,6 +319,7 @@ public class LoginView extends BorderPane implements Disposable {
                 rememberMeBox,
                 errorLabel,
                 signInButton,
+                joinButton,
                 footerBox
         );
 

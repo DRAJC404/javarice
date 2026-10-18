@@ -154,9 +154,36 @@ public class DashboardView extends StackPane implements Disposable {
         restockCard.setPrefWidth(480);
         recentCard.setPrefWidth(480);
 
-        bottomSection.getChildren().addAll(restockCard, recentCard);
+        contentBox.getChildren().add(headerNode);
 
-        contentBox.getChildren().addAll(headerNode, statsRow, midSection, bottomSection);
+        User currentUser = AuthService.getCurrentUser();
+        if (currentUser != null && currentUser.getRole() == com.bai.inventory.model.Role.OWNER && data.staffCount() == 0) {
+            contentBox.getChildren().add(buildInviteTeamBanner());
+        }
+
+        contentBox.getChildren().addAll(statsRow, midSection, bottomSection);
+    }
+
+    private Node buildInviteTeamBanner() {
+        BorderPane banner = new BorderPane();
+        banner.getStyleClass().add("join-code-banner");
+
+        VBox textCol = new VBox(2);
+        Label title = new Label("Invite your team");
+        title.getStyleClass().add("join-code-banner-title");
+
+        Label desc = new Label("Add staff with a one-time code that expires in 10 minutes");
+        desc.getStyleClass().add("join-code-banner-sub");
+        textCol.getChildren().addAll(title, desc);
+
+        Button generateBtn = new Button("Generate join code");
+        generateBtn.getStyleClass().add("btn-primary");
+        generateBtn.setOnAction(e -> com.bai.inventory.view.dialog.JoinCodeDialogHelper.showAddTeamMemberModal(this::loadDashboardDataAsync));
+
+        banner.setLeft(textCol);
+        banner.setRight(generateBtn);
+        BorderPane.setAlignment(generateBtn, Pos.CENTER_RIGHT);
+        return banner;
     }
 
     private Node buildHeader() {

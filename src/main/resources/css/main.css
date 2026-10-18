@@ -1471,3 +1471,116 @@
     -fx-text-fill: -text-main;
     -fx-line-spacing: 3px;
 }
+
+.input-error,
+.text-field.input-error,
+.combo-box.input-error,
+.category-selector.input-error,
+.stack-pane.input-error {
+    -fx-border-color: -status-danger !important;
+    -fx-border-width: 1.5px !important;
+    -fx-border-radius: 6px;
+}
+
+.form-warning-line {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -status-warning;
+    -fx-padding: 4 8;
+    -fx-background-color: #FEF3C7;
+    -fx-background-radius: 6;
+}
+
+/* Join Code & Staff Invitation Tokens */
+.join-code-banner {
+    -fx-background-color: -primary-light;
+    -fx-background-radius: 12px;
+    -fx-border-color: -primary;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+    -fx-padding: 16px 20px;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.join-code-banner-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: 800;
+    -fx-text-fill: -primary;
+}
+
+.join-code-banner-sub {
+    -fx-font-size: 13px;
+    -fx-text-fill: -text-body;
+}
+
+.join-code-badge {
+    -fx-background-color: -primary-light;
+    -fx-text-fill: -primary;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-padding: 2px 8px;
+    -fx-background-radius: 10px;
+}
+
+.join-code-display-box {
+    -fx-background-color: -bg-main;
+    -fx-border-color: -border-subtle;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-padding: 16px 24px;
+    -fx-alignment: CENTER;
+}
+
+.join-code-display-text {
+    -fx-font-family: monospace;
+    -fx-font-size: 32px;
+    -fx-font-weight: 800;
+    -fx-text-fill: -text-main;
+}
+
+.join-code-countdown-text {
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -status-warning;
+}
+
+.join-code-instruction-text {
+    -fx-font-size: 13px;
+    -fx-text-fill: -text-muted;
+    -fx-alignment: CENTER;
+    -fx-text-alignment: CENTER;
+}
+
+.prompt-chip {
+    -fx-background-color: -bg-main;
+    -fx-border-color: -border-medium;
+    -fx-border-width: 1px;
+    -fx-border-radius: 16px;
+    -fx-background-radius: 16px;
+    -fx-padding: 4px 12px;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -text-body;
+    -fx-cursor: hand;
+}
+
+.prompt-chip:hover {
+    -fx-background-color: -primary-light;
+    -fx-border-color: -primary;
+    -fx-text-fill: -primary;
+}
+
+.insight-metric-pill {
+    -fx-background-color: -bg-main;
+    -fx-border-color: -border-subtle;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 3px 8px;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -text-main;
+}
+
+
