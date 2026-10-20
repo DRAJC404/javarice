@@ -7,6 +7,7 @@ public enum ViewType {
     STORE_TERMINAL("Store Terminal"),
     DASHBOARD("Dashboard"),
     PRODUCT("Product"),
+    PRODUCT_REVIEW("Product Review"),
     INVENTORY("Inventory"),
     ANALYTICS("Analytics"),
     REPORT("Report"),

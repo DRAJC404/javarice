@@ -70,9 +70,13 @@ public class ReportService {
         return list;
     }
 
+    public List<com.bai.inventory.model.ProductPerformance> getProductPerformance(User user, LocalDateTime from, LocalDateTime to) {
+        int orgId = (user != null && user.getOrganizationId() > 0) ? user.getOrganizationId() : 1;
+        return reportDao.getProductPerformanceReport(orgId, from, to);
+    }
+
     public void exportToCsv(File file, List<String> headers, List<List<String>> rows) throws IOException {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(file, StandardCharsets.UTF_8))) {
-            // Write CSV header
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < headers.size(); i++) {
                 sb.append(escapeCsv(headers.get(i)));
@@ -81,7 +85,6 @@ public class ReportService {
             sb.append("\n");
             writer.write(sb.toString());
 
-            // Write CSV rows
             for (List<String> row : rows) {
                 sb.setLength(0);
                 for (int i = 0; i < row.size(); i++) {
@@ -104,19 +107,16 @@ public class ReportService {
     }
 
     public void exportToPdf(File file, String title, String subtitle, List<String> headers, List<List<String>> rows) throws DocumentException, IOException {
-        // Landscape A4 for wide table presentation
         Document document = new Document(PageSize.A4.rotate(), 36, 36, 36, 36);
         PdfWriter.getInstance(document, new FileOutputStream(file));
         document.open();
 
-        // Fonts
         Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, new Color(15, 23, 42));
         Font subFont = FontFactory.getFont(FontFactory.HELVETICA, 10, new Color(100, 116, 139));
         Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.WHITE);
         Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 8, new Color(30, 41, 59));
         Font footerFont = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8, new Color(148, 163, 184));
 
-        // Header block
         Paragraph titlePara = new Paragraph("bAI Inventory System — " + title, titleFont);
         titlePara.setSpacingAfter(4);
         document.add(titlePara);
@@ -126,7 +126,6 @@ public class ReportService {
         subPara.setSpacingAfter(16);
         document.add(subPara);
 
-        // Table
         PdfPTable table = new PdfPTable(headers.size());
         table.setWidthPercentage(100);
         table.setSpacingBefore(10);
@@ -136,7 +135,6 @@ public class ReportService {
         Color zebraColor = new Color(248, 250, 252);
         Color borderColor = new Color(226, 232, 240);
 
-        // Add headers
         for (String headerText : headers) {
             PdfPCell cell = new PdfPCell(new Phrase(headerText, headerFont));
             cell.setBackgroundColor(brandColor);
@@ -146,7 +144,6 @@ public class ReportService {
             table.addCell(cell);
         }
 
-        // Add data rows
         int rowIndex = 0;
         for (List<String> row : rows) {
             Color rowBg = (rowIndex % 2 == 1) ? zebraColor : Color.WHITE;
@@ -163,7 +160,6 @@ public class ReportService {
 
         document.add(table);
 
-        // Summary footer
         Paragraph footerPara = new Paragraph("Total Records: " + rows.size() + " | Confidential • Internal Business Use Only", footerFont);
         footerPara.setAlignment(Element.ALIGN_RIGHT);
         footerPara.setSpacingBefore(8);

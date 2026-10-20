@@ -8,10 +8,13 @@ import com.bai.inventory.model.User;
 import com.bai.inventory.service.AuthService;
 import com.bai.inventory.service.ProductService;
 import com.bai.inventory.util.AppExecutor;
+import com.bai.inventory.util.Constants;
+import com.bai.inventory.util.ProductImageManager;
 import com.bai.inventory.view.Disposable;
 import com.bai.inventory.view.component.AppDialog;
 import com.bai.inventory.view.component.CategorySelector;
 import com.bai.inventory.view.component.FormField;
+import com.bai.inventory.view.layout.MainLayoutView;
 import com.bai.inventory.view.navigation.ViewNavigator;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
@@ -32,6 +35,8 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.text.NumberFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -209,16 +214,14 @@ public class ProductCatalogView extends BorderPane implements Disposable {
 
         bar.getChildren().addAll(searchBox, categoryFilterSelector, statusFilterBox);
 
-        if (!isEmployee) {
-            Button addBtn = new Button("Add Product");
-            addBtn.getStyleClass().add("btn-dialog-confirm");
-            SVGPath plusIcon = new SVGPath();
-            plusIcon.setContent(SVG_PLUS);
-            plusIcon.setStyle("-fx-fill: white;");
-            addBtn.setGraphic(plusIcon);
-            addBtn.setOnAction(e -> openAddProductModal());
-            bar.getChildren().add(addBtn);
-        }
+        Button addBtn = new Button(isEmployee ? "Submit Product" : "Add Product");
+        addBtn.getStyleClass().add("btn-dialog-confirm");
+        SVGPath plusIcon = new SVGPath();
+        plusIcon.setContent(SVG_PLUS);
+        plusIcon.setStyle("-fx-fill: white;");
+        addBtn.setGraphic(plusIcon);
+        addBtn.setOnAction(e -> openAddProductModal());
+        bar.getChildren().add(addBtn);
 
         return bar;
     }
@@ -254,7 +257,7 @@ public class ProductCatalogView extends BorderPane implements Disposable {
                 if (empty || item == null) {
                     setGraphic(null);
                 } else if (item.getImagePath() != null && !item.getImagePath().trim().isEmpty()) {
-                    Image cached = AppExecutor.getCachedImage(item.getImagePath(), 40, 40);
+                    Image cached = ProductImageManager.getImage(item.getImagePath(), item.getOrganizationId(), 40, 40);
                     if (cached != null) {
                         iv.setImage(cached);
                         setGraphic(iv);
@@ -360,10 +363,9 @@ public class ProductCatalogView extends BorderPane implements Disposable {
                     setGraphic(null);
                 } else {
                     VBox box = new VBox(2);
-                    String unit = item.getUnit() != null ? item.getUnit() : "pcs";
-                    Label qty = new Label(item.getStockQuantity() + " " + unit);
+                    Label qty = new Label(item.getStockQuantity() + " " + Constants.UNIT);
                     qty.setStyle("-fx-font-weight: 700; -fx-font-size: 13px; -fx-text-fill: -text-main;");
-                    Label par = new Label("Par threshold: " + item.getLowStockThreshold());
+                    Label par = new Label("Par threshold: " + item.getLowStockThreshold() + " " + Constants.UNIT);
                     par.setStyle("-fx-font-size: 11px; -fx-text-fill: -text-muted;");
                     box.getChildren().addAll(qty, par);
                     setGraphic(box);
@@ -392,18 +394,31 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         });
         costCol.setStyle("-fx-alignment: CENTER_RIGHT; -fx-text-fill: -text-muted;");
 
+        TableColumn<Product, String> profitCol = new TableColumn<>("Profit / Unit");
+        profitCol.setMinWidth(110);
+        profitCol.setPrefWidth(120);
+        profitCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getFormattedProfit()));
+        profitCol.setStyle("-fx-alignment: CENTER_RIGHT; -fx-font-weight: 700; -fx-text-fill: -success;");
+
         TableColumn<Product, Product> actionCol = new TableColumn<>("Actions");
-        actionCol.setMinWidth(150);
-        actionCol.setPrefWidth(160);
+        actionCol.setMinWidth(250);
+        actionCol.setPrefWidth(270);
         actionCol.setCellValueFactory(data -> new SimpleObjectProperty<>(data.getValue()));
         actionCol.setCellFactory(col -> new TableCell<>() {
+            private final Button historyBtn = new Button("History");
             private final Button editBtn = new Button("Edit");
+            private final Button deleteBtn = new Button("Delete");
             private final Button archiveBtn = new Button("Archive");
-            private final HBox actionBox = new HBox(8, editBtn, archiveBtn);
+            private final HBox actionBox = new HBox(6, historyBtn, editBtn);
 
             {
+                historyBtn.getStyleClass().add("btn-dialog-cancel");
+                historyBtn.setMinWidth(Button.USE_PREF_SIZE);
                 editBtn.getStyleClass().add("btn-action-edit");
                 editBtn.setMinWidth(Button.USE_PREF_SIZE);
+                deleteBtn.getStyleClass().add("btn-action-archive");
+                deleteBtn.setStyle("-fx-background-color: #fee2e2; -fx-text-fill: #991b1b;");
+                deleteBtn.setMinWidth(Button.USE_PREF_SIZE);
                 archiveBtn.getStyleClass().add("btn-action-archive");
                 archiveBtn.setMinWidth(Button.USE_PREF_SIZE);
                 actionBox.setAlignment(Pos.CENTER);
@@ -412,28 +427,41 @@ public class ProductCatalogView extends BorderPane implements Disposable {
             @Override
             protected void updateItem(Product item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || item == null || isEmployee) {
+                if (empty || item == null) {
                     setGraphic(null);
                 } else {
-                    if (item.isArchived()) {
-                        archiveBtn.setText("Restore");
-                        archiveBtn.getStyleClass().setAll("btn-action-restore");
-                        archiveBtn.setOnAction(e -> handleRestoreProduct(item));
-                    } else {
-                        archiveBtn.setText("Archive");
-                        archiveBtn.getStyleClass().setAll("btn-action-archive");
-                        archiveBtn.setOnAction(e -> handleArchiveProduct(item));
-                    }
-
+                    historyBtn.setOnAction(e -> openHistoryModal(item));
                     editBtn.setOnAction(e -> openEditProductModal(item));
+
+                    actionBox.getChildren().setAll(historyBtn, editBtn);
+
+                    if (!isEmployee) {
+                        if (item.isArchived()) {
+                            archiveBtn.setText("Restore");
+                            archiveBtn.getStyleClass().setAll("btn-action-restore");
+                            archiveBtn.setOnAction(e -> handleRestoreProduct(item));
+                        } else {
+                            archiveBtn.setText("Archive");
+                            archiveBtn.getStyleClass().setAll("btn-action-archive");
+                            archiveBtn.setOnAction(e -> handleArchiveProduct(item));
+                        }
+                        deleteBtn.setOnAction(e -> handleDeleteProduct(item));
+                        actionBox.getChildren().addAll(archiveBtn, deleteBtn);
+                    }
                     setGraphic(actionBox);
                 }
             }
         });
 
-        productTable.getColumns().addAll(
-                imgCol, skuCol, nameCol, statusCol, qtyCol, sellCol, costCol, actionCol
-        );
+        if (!isEmployee) {
+            productTable.getColumns().addAll(
+                    imgCol, skuCol, nameCol, statusCol, qtyCol, sellCol, costCol, profitCol, actionCol
+            );
+        } else {
+            productTable.getColumns().addAll(
+                    imgCol, skuCol, nameCol, statusCol, qtyCol, sellCol, actionCol
+            );
+        }
 
         return productTable;
     }
@@ -503,7 +531,9 @@ public class ProductCatalogView extends BorderPane implements Disposable {
     private void openAddProductModal() {
         AppDialog dialog = new AppDialog("Add New Product", 560);
 
+        final SimpleObjectProperty<File> selectedImageFile = new SimpleObjectProperty<>(null);
         final SimpleObjectProperty<String> selectedImagePath = new SimpleObjectProperty<>(null);
+
         StackPane imgPreviewBox = new StackPane();
         imgPreviewBox.setPrefSize(70, 70);
         imgPreviewBox.setMinSize(70, 70);
@@ -519,6 +549,7 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         previewImgView.setFitWidth(66);
         previewImgView.setFitHeight(66);
         previewImgView.setPreserveRatio(true);
+        previewImgView.setSmooth(true);
 
         VBox imgDetails = new VBox(6);
         imgDetails.setAlignment(Pos.CENTER_LEFT);
@@ -526,6 +557,15 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         Button uploadImgBtn = new Button("Upload image");
         uploadImgBtn.getStyleClass().add("btn-dialog-cancel");
         uploadImgBtn.setMinWidth(Button.USE_PREF_SIZE);
+
+        Button removeImgBtn = new Button("Remove");
+        removeImgBtn.getStyleClass().add("btn-dialog-cancel");
+        removeImgBtn.setMinWidth(Button.USE_PREF_SIZE);
+        removeImgBtn.setVisible(false);
+        removeImgBtn.setManaged(false);
+
+        HBox btnRow = new HBox(8, uploadImgBtn, removeImgBtn);
+        btnRow.setAlignment(Pos.CENTER_LEFT);
 
         Label imgHint = new Label("PNG/JPG/GIF, max 5 MB");
         imgHint.getStyleClass().add("form-helper");
@@ -538,23 +578,32 @@ public class ProductCatalogView extends BorderPane implements Disposable {
             chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Image Files (*.png, *.jpg, *.jpeg, *.gif)", "*.png", "*.jpg", "*.jpeg", "*.gif"));
             File file = chooser.showOpenDialog(ViewNavigator.getPrimaryStage());
             if (file != null) {
-                if (file.length() > 5 * 1024 * 1024) {
-                    imgField.setError("Image file size exceeds 5 MB limit.");
-                    return;
-                }
-                if (!ProductService.isValidProductImage(file.getAbsolutePath())) {
-                    imgField.setError("Selected file is not a valid decodable image.");
+                if (!ProductImageManager.isValidImageFile(file)) {
+                    imgField.setError("Please choose a PNG, JPG, or GIF under 5 MB.");
                     return;
                 }
                 imgField.clearError();
-                selectedImagePath.set(file.getAbsolutePath());
+                selectedImageFile.set(file);
+                selectedImagePath.set(null);
                 previewImgView.setImage(new Image(file.toURI().toString(), 70, 70, true, true));
                 imgPreviewBox.getChildren().setAll(previewImgView);
                 imgHint.setText(file.getName());
+                removeImgBtn.setVisible(true);
+                removeImgBtn.setManaged(true);
             }
         });
 
-        imgDetails.getChildren().addAll(uploadImgBtn, imgHint);
+        removeImgBtn.setOnAction(e -> {
+            selectedImageFile.set(null);
+            selectedImagePath.set(null);
+            imgPreviewBox.getChildren().setAll(defaultBoxIcon);
+            imgHint.setText("PNG/JPG/GIF, max 5 MB");
+            removeImgBtn.setVisible(false);
+            removeImgBtn.setManaged(false);
+            imgField.clearError();
+        });
+
+        imgDetails.getChildren().addAll(btnRow, imgHint);
 
         TextField nameField = new TextField();
         nameField.setPromptText("e.g. Barako Coffee Beans 1kg");
@@ -565,38 +614,40 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         categorySelector.setMaxWidth(Double.MAX_VALUE);
         FormField categoryFormField = new FormField("Category", categorySelector, true);
 
-        ComboBox<String> unitBox = new ComboBox<>();
-        unitBox.getItems().addAll("pcs", "bag", "box", "keg", "tin", "carton", "sleeve", "pack", "kg", "g", "L");
-        unitBox.getSelectionModel().select("pcs");
-        unitBox.setMaxWidth(Double.MAX_VALUE);
-        FormField unitFormField = new FormField("Unit", unitBox, true);
-        HBox.setHgrow(unitFormField, Priority.ALWAYS);
-
-        TextField thresholdField = new TextField("10");
-        thresholdField.setMaxWidth(Double.MAX_VALUE);
-        FormField thresholdFormField = new FormField("Low-stock level", thresholdField, true);
-        HBox.setHgrow(thresholdFormField, Priority.ALWAYS);
-
-        HBox unitThresholdRow = new HBox(12, unitFormField, thresholdFormField);
+        categorySelector.setOnCategoryCreated(createdCat -> {
+            categoryFormField.clearError();
+            String currentName = nameField.getText();
+            if (currentName == null || currentName.trim().isEmpty()) {
+                nameField.requestFocus();
+            } else {
+                categorySelector.getComboBox().requestFocus();
+            }
+        });
 
         TextField qtyField = new TextField("0");
         qtyField.setMaxWidth(Double.MAX_VALUE);
-        FormField qtyFormField = new FormField("Starting quantity", qtyField, true, "Recorded as opening stock movement");
+        FormField qtyFormField = new FormField("Starting quantity (" + Constants.UNIT + ")", qtyField, true, "Recorded as opening stock movement");
         HBox.setHgrow(qtyFormField, Priority.ALWAYS);
+
+        TextField thresholdField = new TextField("10");
+        thresholdField.setMaxWidth(Double.MAX_VALUE);
+        FormField thresholdFormField = new FormField("Low-stock level (" + Constants.UNIT + ")", thresholdField, true);
+        HBox.setHgrow(thresholdFormField, Priority.ALWAYS);
+
+        HBox qtyThresholdRow = new HBox(12, qtyFormField, thresholdFormField);
 
         TextField priceField = new TextField("0.00");
         priceField.setMaxWidth(Double.MAX_VALUE);
         FormField priceFormField = new FormField("Selling price (₱)", priceField, true);
         HBox.setHgrow(priceFormField, Priority.ALWAYS);
 
-        HBox qtyPriceRow = new HBox(12, qtyFormField, priceFormField);
-
         TextField costField = new TextField("0.00");
         costField.setMaxWidth(Double.MAX_VALUE);
         FormField costFormField = new FormField("Cost price (₱)", costField, true);
         HBox.setHgrow(costFormField, Priority.ALWAYS);
 
-        // Warning line for selling price < cost price
+        HBox priceCostRow = new HBox(12, priceFormField, costFormField);
+
         Label priceWarningLabel = new Label("⚠️ Warning: Selling price is lower than cost price (selling at a loss).");
         priceWarningLabel.getStyleClass().add("form-warning-line");
         priceWarningLabel.setVisible(false);
@@ -645,14 +696,12 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         FormField barcodeFormField = new FormField("Barcode", barcodeInputRow, true);
         HBox.setHgrow(barcodeFormField, Priority.ALWAYS);
 
-        HBox costSkuRow = new HBox(12, costFormField, skuFormField);
-        HBox barcodeRow = new HBox(12, barcodeFormField);
+        HBox skuBarcodeRow = new HBox(12, skuFormField, barcodeFormField);
 
-        // Auto-generate initial SKU & Barcode
         skuField.setText(productService.generateUniqueSku(currentUser, null));
         barcodeField.setText(productService.generateUniqueBarcode(currentUser));
 
-        dialog.addBody(imgField, nameFormField, categoryFormField, unitThresholdRow, qtyPriceRow, priceWarningLabel, costSkuRow, barcodeRow);
+        dialog.addBody(imgField, nameFormField, categoryFormField, qtyThresholdRow, priceCostRow, priceWarningLabel, skuBarcodeRow);
 
         Button cancelBtn = new Button("Cancel");
         cancelBtn.getStyleClass().add("btn-dialog-cancel");
@@ -661,11 +710,9 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         Button saveBtn = new Button("Save Product");
         saveBtn.getStyleClass().add("btn-dialog-confirm");
         saveBtn.setOnAction(e -> {
-            // Clear previous errors
             imgField.clearError();
             nameFormField.clearError();
             categoryFormField.clearError();
-            unitFormField.clearError();
             qtyFormField.clearError();
             priceFormField.clearError();
             costFormField.clearError();
@@ -676,8 +723,8 @@ public class ProductCatalogView extends BorderPane implements Disposable {
             boolean hasError = false;
             FormField firstInvalid = null;
 
-            if (selectedImagePath.get() == null || selectedImagePath.get().trim().isEmpty()) {
-                imgField.setError("Product picture is required.");
+            if (selectedImageFile.get() == null && (selectedImagePath.get() == null || selectedImagePath.get().trim().isEmpty())) {
+                imgField.setError("Please choose a PNG, JPG, or GIF under 5 MB.");
                 hasError = true;
                 if (firstInvalid == null) firstInvalid = imgField;
             }
@@ -700,23 +747,16 @@ public class ProductCatalogView extends BorderPane implements Disposable {
                 if (firstInvalid == null) firstInvalid = categoryFormField;
             }
 
-            String unit = unitBox.getValue();
-            if (unit == null || unit.trim().isEmpty()) {
-                unitFormField.setError("Unit is required.");
-                hasError = true;
-                if (firstInvalid == null) firstInvalid = unitFormField;
-            }
-
             int qty = 0;
             try {
                 qty = Integer.parseInt(qtyField.getText().trim());
                 if (qty < 0) {
-                    qtyFormField.setError("Starting quantity must be 0 or greater.");
+                    qtyFormField.setError("Please enter a whole number of pieces.");
                     hasError = true;
                     if (firstInvalid == null) firstInvalid = qtyFormField;
                 }
             } catch (Exception ex) {
-                qtyFormField.setError("Starting quantity must be a whole number.");
+                qtyFormField.setError("Please enter a whole number of pieces.");
                 hasError = true;
                 if (firstInvalid == null) firstInvalid = qtyFormField;
             }
@@ -725,12 +765,12 @@ public class ProductCatalogView extends BorderPane implements Disposable {
             try {
                 threshold = Integer.parseInt(thresholdField.getText().trim());
                 if (threshold < 0) {
-                    thresholdFormField.setError("Low-stock level must be 0 or greater.");
+                    thresholdFormField.setError("Please enter a whole number of pieces.");
                     hasError = true;
                     if (firstInvalid == null) firstInvalid = thresholdFormField;
                 }
             } catch (Exception ex) {
-                thresholdFormField.setError("Low-stock level must be a whole number.");
+                thresholdFormField.setError("Please enter a whole number of pieces.");
                 hasError = true;
                 if (firstInvalid == null) firstInvalid = thresholdFormField;
             }
@@ -798,17 +838,29 @@ public class ProductCatalogView extends BorderPane implements Disposable {
                 return;
             }
 
+            int orgId = currentUser.getOrganizationId() > 0 ? currentUser.getOrganizationId() : 1;
+            String finalImagePath = selectedImagePath.get();
+            if (selectedImageFile.get() != null) {
+                try {
+                    finalImagePath = ProductImageManager.storeImage(selectedImageFile.get(), orgId);
+                } catch (Exception ioEx) {
+                    imgField.setError("We couldn't save the picture. Please try again.");
+                    imgField.requestFocusOnInput();
+                    return;
+                }
+            }
+
             Product p = new Product();
             p.setName(name);
             p.setCategoryId(catId);
-            p.setUnit(unit);
+            p.setUnit(Constants.UNIT);
             p.setSku(sku);
             p.setBarcode(barcode);
             p.setCostPrice(cost);
             p.setSellingPrice(price);
             p.setStockQuantity(qty);
             p.setLowStockThreshold(threshold);
-            p.setImagePath(selectedImagePath.get());
+            p.setImagePath(finalImagePath);
 
             saveBtn.setDisable(true);
             saveBtn.setText("Saving...");
@@ -817,8 +869,15 @@ public class ProductCatalogView extends BorderPane implements Disposable {
                     productService.createProduct(p, currentUser);
                     Platform.runLater(() -> {
                         ViewNavigator.hideOverlayDialog();
-                        ViewNavigator.showToast("Product '" + name + "' added successfully.", false);
+                        if (isEmployee) {
+                            ViewNavigator.showToast("Submitted for approval! A manager will review your submission before it appears in inventory.", false);
+                        } else {
+                            ViewNavigator.showToast("Product '" + name + "' added successfully.", false);
+                        }
                         loadInitialData();
+                        if (ViewNavigator.getCurrentPage() instanceof MainLayoutView ml) {
+                            ml.refreshReviewBadge();
+                        }
                     });
                 } catch (ProductService.ValidationException ve) {
                     Platform.runLater(() -> {
@@ -830,7 +889,6 @@ public class ProductCatalogView extends BorderPane implements Disposable {
                                 case "picture" -> { imgField.setError(fe.message()); if (firstErr == null) firstErr = imgField; }
                                 case "name" -> { nameFormField.setError(fe.message()); if (firstErr == null) firstErr = nameFormField; }
                                 case "category" -> { categoryFormField.setError(fe.message()); if (firstErr == null) firstErr = categoryFormField; }
-                                case "unit" -> { unitFormField.setError(fe.message()); if (firstErr == null) firstErr = unitFormField; }
                                 case "startingQuantity" -> { qtyFormField.setError(fe.message()); if (firstErr == null) firstErr = qtyFormField; }
                                 case "sellingPrice" -> { priceFormField.setError(fe.message()); if (firstErr == null) firstErr = priceFormField; }
                                 case "costPrice" -> { costFormField.setError(fe.message()); if (firstErr == null) firstErr = costFormField; }
@@ -859,35 +917,24 @@ public class ProductCatalogView extends BorderPane implements Disposable {
     private void openEditProductModal(Product product) {
         AppDialog dialog = new AppDialog("Edit Product: " + product.getName(), 560);
 
+        final SimpleObjectProperty<File> selectedImageFile = new SimpleObjectProperty<>(null);
         final SimpleObjectProperty<String> selectedImagePath = new SimpleObjectProperty<>(product.getImagePath());
+
         StackPane imgPreviewBox = new StackPane();
         imgPreviewBox.setPrefSize(70, 70);
         imgPreviewBox.setMinSize(70, 70);
         imgPreviewBox.setMaxSize(70, 70);
         imgPreviewBox.getStyleClass().add("item-thumb-box");
 
+        SVGPath defaultBoxIcon = new SVGPath();
+        defaultBoxIcon.setContent(SVG_BOX);
+        defaultBoxIcon.getStyleClass().add("sidebar-item-icon");
+
         ImageView previewImgView = new ImageView();
         previewImgView.setFitWidth(66);
         previewImgView.setFitHeight(66);
         previewImgView.setPreserveRatio(true);
-
-        if (product.getImagePath() != null) {
-            Image cached = AppExecutor.getCachedImage(product.getImagePath(), 70, 70);
-            if (cached != null) {
-                previewImgView.setImage(cached);
-                imgPreviewBox.getChildren().setAll(previewImgView);
-            } else {
-                SVGPath defaultBoxIcon = new SVGPath();
-                defaultBoxIcon.setContent(SVG_BOX);
-                defaultBoxIcon.getStyleClass().add("sidebar-item-icon");
-                imgPreviewBox.getChildren().add(defaultBoxIcon);
-            }
-        } else {
-            SVGPath defaultBoxIcon = new SVGPath();
-            defaultBoxIcon.setContent(SVG_BOX);
-            defaultBoxIcon.getStyleClass().add("sidebar-item-icon");
-            imgPreviewBox.getChildren().add(defaultBoxIcon);
-        }
+        previewImgView.setSmooth(true);
 
         VBox imgDetails = new VBox(6);
         imgDetails.setAlignment(Pos.CENTER_LEFT);
@@ -896,9 +943,34 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         uploadImgBtn.getStyleClass().add("btn-dialog-cancel");
         uploadImgBtn.setMinWidth(Button.USE_PREF_SIZE);
 
+        Button removeImgBtn = new Button("Remove");
+        removeImgBtn.getStyleClass().add("btn-dialog-cancel");
+        removeImgBtn.setMinWidth(Button.USE_PREF_SIZE);
+
+        HBox btnRow = new HBox(8, uploadImgBtn, removeImgBtn);
+        btnRow.setAlignment(Pos.CENTER_LEFT);
+
         String initialFileName = product.getImagePath() != null ? new File(product.getImagePath()).getName() : "PNG/JPG/GIF, max 5 MB";
         Label imgHint = new Label(initialFileName);
         imgHint.getStyleClass().add("form-helper");
+
+        if (product.getImagePath() != null && !product.getImagePath().trim().isEmpty()) {
+            Image cached = ProductImageManager.getImage(product.getImagePath(), product.getOrganizationId(), 70, 70);
+            if (cached != null) {
+                previewImgView.setImage(cached);
+                imgPreviewBox.getChildren().setAll(previewImgView);
+                removeImgBtn.setVisible(true);
+                removeImgBtn.setManaged(true);
+            } else {
+                imgPreviewBox.getChildren().setAll(defaultBoxIcon);
+                removeImgBtn.setVisible(false);
+                removeImgBtn.setManaged(false);
+            }
+        } else {
+            imgPreviewBox.getChildren().setAll(defaultBoxIcon);
+            removeImgBtn.setVisible(false);
+            removeImgBtn.setManaged(false);
+        }
 
         FormField imgField = new FormField("Product picture", new HBox(14, imgPreviewBox, imgDetails), true);
 
@@ -908,23 +980,32 @@ public class ProductCatalogView extends BorderPane implements Disposable {
             chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Image Files (*.png, *.jpg, *.jpeg, *.gif)", "*.png", "*.jpg", "*.jpeg", "*.gif"));
             File file = chooser.showOpenDialog(ViewNavigator.getPrimaryStage());
             if (file != null) {
-                if (file.length() > 5 * 1024 * 1024) {
-                    imgField.setError("Image file size exceeds 5 MB limit.");
-                    return;
-                }
-                if (!ProductService.isValidProductImage(file.getAbsolutePath())) {
-                    imgField.setError("Selected file is not a valid decodable image.");
+                if (!ProductImageManager.isValidImageFile(file)) {
+                    imgField.setError("Please choose a PNG, JPG, or GIF under 5 MB.");
                     return;
                 }
                 imgField.clearError();
-                selectedImagePath.set(file.getAbsolutePath());
+                selectedImageFile.set(file);
+                selectedImagePath.set(null);
                 previewImgView.setImage(new Image(file.toURI().toString(), 70, 70, true, true));
                 imgPreviewBox.getChildren().setAll(previewImgView);
                 imgHint.setText(file.getName());
+                removeImgBtn.setVisible(true);
+                removeImgBtn.setManaged(true);
             }
         });
 
-        imgDetails.getChildren().addAll(uploadImgBtn, imgHint);
+        removeImgBtn.setOnAction(e -> {
+            selectedImageFile.set(null);
+            selectedImagePath.set(null);
+            imgPreviewBox.getChildren().setAll(defaultBoxIcon);
+            imgHint.setText("PNG/JPG/GIF, max 5 MB");
+            removeImgBtn.setVisible(false);
+            removeImgBtn.setManaged(false);
+            imgField.clearError();
+        });
+
+        imgDetails.getChildren().addAll(btnRow, imgHint);
 
         TextField nameField = new TextField(product.getName());
         nameField.setMaxWidth(Double.MAX_VALUE);
@@ -935,41 +1016,43 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         categorySelector.setSelectedCategoryId(product.getCategoryId());
         FormField categoryFormField = new FormField("Category", categorySelector, true);
 
-        ComboBox<String> unitBox = new ComboBox<>();
-        unitBox.getItems().addAll("pcs", "bag", "box", "keg", "tin", "carton", "sleeve", "pack", "kg", "g", "L");
-        unitBox.getSelectionModel().select(product.getUnit() != null ? product.getUnit() : "pcs");
-        unitBox.setMaxWidth(Double.MAX_VALUE);
-        FormField unitFormField = new FormField("Unit", unitBox, true);
-        HBox.setHgrow(unitFormField, Priority.ALWAYS);
+        categorySelector.setOnCategoryCreated(createdCat -> {
+            categoryFormField.clearError();
+            String currentName = nameField.getText();
+            if (currentName == null || currentName.trim().isEmpty()) {
+                nameField.requestFocus();
+            } else {
+                categorySelector.getComboBox().requestFocus();
+            }
+        });
 
-        TextField thresholdField = new TextField(String.valueOf(product.getLowStockThreshold()));
-        thresholdField.setMaxWidth(Double.MAX_VALUE);
-        FormField thresholdFormField = new FormField("Low-stock level", thresholdField, true);
-        HBox.setHgrow(thresholdFormField, Priority.ALWAYS);
-
-        HBox unitThresholdRow = new HBox(12, unitFormField, thresholdFormField);
-
-        String currentStockText = product.getStockQuantity() + " " + (product.getUnit() != null ? product.getUnit() : "pcs");
+        String currentStockText = product.getStockQuantity() + " " + Constants.UNIT;
         TextField stockField = new TextField(currentStockText);
         stockField.setEditable(false);
         stockField.setDisable(true);
         stockField.setMaxWidth(Double.MAX_VALUE);
-        FormField stockFormField = new FormField("Starting quantity", stockField, true, "Starting quantity is locked after creation");
+        FormField stockFormField = new FormField("Current stock (" + Constants.UNIT + ")", stockField, true, "Stock quantity is modified via restock, audit, or deductions");
         HBox.setHgrow(stockFormField, Priority.ALWAYS);
+
+        TextField thresholdField = new TextField(String.valueOf(product.getLowStockThreshold()));
+        thresholdField.setMaxWidth(Double.MAX_VALUE);
+        FormField thresholdFormField = new FormField("Low-stock level (" + Constants.UNIT + ")", thresholdField, true);
+        HBox.setHgrow(thresholdFormField, Priority.ALWAYS);
+
+        HBox stockThresholdRow = new HBox(12, stockFormField, thresholdFormField);
 
         TextField priceField = new TextField(product.getSellingPrice() != null ? product.getSellingPrice().toPlainString() : "0.00");
         priceField.setMaxWidth(Double.MAX_VALUE);
         FormField priceFormField = new FormField("Selling price (₱)", priceField, true);
         HBox.setHgrow(priceFormField, Priority.ALWAYS);
 
-        HBox stockPriceRow = new HBox(12, stockFormField, priceFormField);
-
         TextField costField = new TextField(product.getCostPrice() != null ? product.getCostPrice().toPlainString() : "0.00");
         costField.setMaxWidth(Double.MAX_VALUE);
         FormField costFormField = new FormField("Cost price (₱)", costField, true);
         HBox.setHgrow(costFormField, Priority.ALWAYS);
 
-        // Warning line for selling price < cost price
+        HBox priceCostRow = new HBox(12, priceFormField, costFormField);
+
         Label priceWarningLabel = new Label("⚠️ Warning: Selling price is lower than cost price (selling at a loss).");
         priceWarningLabel.getStyleClass().add("form-warning-line");
         priceWarningLabel.setVisible(false);
@@ -1017,10 +1100,9 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         FormField barcodeFormField = new FormField("Barcode", barcodeInputRow, true);
         HBox.setHgrow(barcodeFormField, Priority.ALWAYS);
 
-        HBox costSkuRow = new HBox(12, costFormField, skuFormField);
-        HBox barcodeRow = new HBox(12, barcodeFormField);
+        HBox skuBarcodeRow = new HBox(12, skuFormField, barcodeFormField);
 
-        dialog.addBody(imgField, nameFormField, categoryFormField, unitThresholdRow, stockPriceRow, priceWarningLabel, costSkuRow, barcodeRow);
+        dialog.addBody(imgField, nameFormField, categoryFormField, stockThresholdRow, priceCostRow, priceWarningLabel, skuBarcodeRow);
 
         Button cancelBtn = new Button("Cancel");
         cancelBtn.getStyleClass().add("btn-dialog-cancel");
@@ -1029,11 +1111,9 @@ public class ProductCatalogView extends BorderPane implements Disposable {
         Button saveBtn = new Button("Update Product");
         saveBtn.getStyleClass().add("btn-dialog-confirm");
         saveBtn.setOnAction(e -> {
-            // Clear previous errors
             imgField.clearError();
             nameFormField.clearError();
             categoryFormField.clearError();
-            unitFormField.clearError();
             priceFormField.clearError();
             costFormField.clearError();
             skuFormField.clearError();
@@ -1043,8 +1123,8 @@ public class ProductCatalogView extends BorderPane implements Disposable {
             boolean hasError = false;
             FormField firstInvalid = null;
 
-            if (selectedImagePath.get() == null || selectedImagePath.get().trim().isEmpty()) {
-                imgField.setError("Product picture is required.");
+            if (selectedImageFile.get() == null && (selectedImagePath.get() == null || selectedImagePath.get().trim().isEmpty())) {
+                imgField.setError("Please choose a PNG, JPG, or GIF under 5 MB.");
                 hasError = true;
                 if (firstInvalid == null) firstInvalid = imgField;
             }
@@ -1067,23 +1147,16 @@ public class ProductCatalogView extends BorderPane implements Disposable {
                 if (firstInvalid == null) firstInvalid = categoryFormField;
             }
 
-            String unit = unitBox.getValue();
-            if (unit == null || unit.trim().isEmpty()) {
-                unitFormField.setError("Unit is required.");
-                hasError = true;
-                if (firstInvalid == null) firstInvalid = unitFormField;
-            }
-
             int threshold = 10;
             try {
                 threshold = Integer.parseInt(thresholdField.getText().trim());
                 if (threshold < 0) {
-                    thresholdFormField.setError("Low-stock level must be 0 or greater.");
+                    thresholdFormField.setError("Please enter a whole number of pieces.");
                     hasError = true;
                     if (firstInvalid == null) firstInvalid = thresholdFormField;
                 }
             } catch (Exception ex) {
-                thresholdFormField.setError("Low-stock level must be a whole number.");
+                thresholdFormField.setError("Please enter a whole number of pieces.");
                 hasError = true;
                 if (firstInvalid == null) firstInvalid = thresholdFormField;
             }
@@ -1151,15 +1224,27 @@ public class ProductCatalogView extends BorderPane implements Disposable {
                 return;
             }
 
+            int orgId = currentUser.getOrganizationId() > 0 ? currentUser.getOrganizationId() : 1;
+            String finalImagePath = selectedImagePath.get();
+            if (selectedImageFile.get() != null) {
+                try {
+                    finalImagePath = ProductImageManager.storeImage(selectedImageFile.get(), orgId);
+                } catch (Exception ioEx) {
+                    imgField.setError("We couldn't save the picture. Please try again.");
+                    imgField.requestFocusOnInput();
+                    return;
+                }
+            }
+
             product.setName(name);
             product.setCategoryId(catId);
-            product.setUnit(unit);
+            product.setUnit(Constants.UNIT);
             product.setSku(sku);
             product.setBarcode(barcode);
             product.setCostPrice(cost);
             product.setSellingPrice(price);
             product.setLowStockThreshold(threshold);
-            product.setImagePath(selectedImagePath.get());
+            product.setImagePath(finalImagePath);
 
             saveBtn.setDisable(true);
             saveBtn.setText("Updating...");
@@ -1168,8 +1253,15 @@ public class ProductCatalogView extends BorderPane implements Disposable {
                     productService.updateProduct(product, currentUser);
                     Platform.runLater(() -> {
                         ViewNavigator.hideOverlayDialog();
-                        ViewNavigator.showToast("Product '" + name + "' updated.", false);
+                        if (isEmployee) {
+                            ViewNavigator.showToast("Submitted for approval! A manager will review your changes.", false);
+                        } else {
+                            ViewNavigator.showToast("Product '" + name + "' updated.", false);
+                        }
                         loadInitialData();
+                        if (ViewNavigator.getCurrentPage() instanceof MainLayoutView ml) {
+                            ml.refreshReviewBadge();
+                        }
                     });
                 } catch (ProductService.ValidationException ve) {
                     Platform.runLater(() -> {
@@ -1181,7 +1273,6 @@ public class ProductCatalogView extends BorderPane implements Disposable {
                                 case "picture" -> { imgField.setError(fe.message()); if (firstErr == null) firstErr = imgField; }
                                 case "name" -> { nameFormField.setError(fe.message()); if (firstErr == null) firstErr = nameFormField; }
                                 case "category" -> { categoryFormField.setError(fe.message()); if (firstErr == null) firstErr = categoryFormField; }
-                                case "unit" -> { unitFormField.setError(fe.message()); if (firstErr == null) firstErr = unitFormField; }
                                 case "sellingPrice" -> { priceFormField.setError(fe.message()); if (firstErr == null) firstErr = priceFormField; }
                                 case "costPrice" -> { costFormField.setError(fe.message()); if (firstErr == null) firstErr = costFormField; }
                                 case "sku" -> { skuFormField.setError(fe.message()); if (firstErr == null) firstErr = skuFormField; }
@@ -1242,6 +1333,103 @@ public class ProductCatalogView extends BorderPane implements Disposable {
                             });
                         } catch (Exception ex) {
                             Platform.runLater(() -> ViewNavigator.showToast("Error restoring: " + ex.getMessage(), true));
+                        }
+                    });
+                }
+        );
+    }
+
+    private void openHistoryModal(Product product) {
+        AppDialog dialog = new AppDialog("Product History — " + product.getName(), 680);
+
+        VBox content = new VBox(12);
+        content.setFillWidth(true);
+
+        HBox filterBar = new HBox(12);
+        filterBar.setAlignment(Pos.CENTER_LEFT);
+
+        ComboBox<String> actionCombo = new ComboBox<>();
+        actionCombo.getItems().addAll("ALL", "CREATE", "UPDATE", "APPROVE", "REJECT", "DELETE", "SUBMIT_CREATE", "SUBMIT_UPDATE");
+        actionCombo.setValue("ALL");
+
+        ComboBox<String> dateCombo = new ComboBox<>();
+        dateCombo.getItems().addAll("All Time", "Today", "Last 7 Days", "Last 30 Days");
+        dateCombo.setValue("All Time");
+
+        filterBar.getChildren().addAll(
+                new Label("Action:"), actionCombo,
+                new Label("Date:"), dateCombo
+        );
+
+        TableView<com.bai.inventory.model.ProductHistory> table = new TableView<>();
+        table.setPrefHeight(360);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        TableColumn<com.bai.inventory.model.ProductHistory, String> dateCol = new TableColumn<>("Date & Time");
+        dateCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getDate() != null ? d.getValue().getDate().format(DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm")) : "—"));
+
+        TableColumn<com.bai.inventory.model.ProductHistory, String> actCol = new TableColumn<>("Action");
+        actCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getAction()));
+
+        TableColumn<com.bai.inventory.model.ProductHistory, String> fieldCol = new TableColumn<>("Field");
+        fieldCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getField() != null ? d.getValue().getField() : "—"));
+
+        TableColumn<com.bai.inventory.model.ProductHistory, String> oldCol = new TableColumn<>("Old Value");
+        oldCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getOldValue() != null ? d.getValue().getOldValue() : "—"));
+
+        TableColumn<com.bai.inventory.model.ProductHistory, String> newCol = new TableColumn<>("New Value");
+        newCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getNewValue() != null ? d.getValue().getNewValue() : "—"));
+
+        TableColumn<com.bai.inventory.model.ProductHistory, String> userCol = new TableColumn<>("User");
+        userCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getUserName() != null ? d.getValue().getUserName() : "Staff"));
+
+        table.getColumns().addAll(List.of(dateCol, actCol, fieldCol, oldCol, newCol, userCol));
+
+        Runnable loadHistory = () -> {
+            String act = actionCombo.getValue();
+            String range = dateCombo.getValue();
+            LocalDate from = null;
+            LocalDate to = LocalDate.now();
+            if ("Today".equals(range)) from = LocalDate.now();
+            else if ("Last 7 Days".equals(range)) from = LocalDate.now().minusDays(7);
+            else if ("Last 30 Days".equals(range)) from = LocalDate.now().minusDays(30);
+
+            final LocalDate finalFrom = from;
+            AppExecutor.execute(() -> {
+                List<com.bai.inventory.model.ProductHistory> history = productService.getProductHistory(product.getId(), act, finalFrom, to);
+                Platform.runLater(() -> table.getItems().setAll(history));
+            });
+        };
+
+        actionCombo.setOnAction(e -> loadHistory.run());
+        dateCombo.setOnAction(e -> loadHistory.run());
+        loadHistory.run();
+
+        content.getChildren().addAll(filterBar, table);
+        dialog.addBody(content);
+
+        Button closeBtn = new Button("Close");
+        closeBtn.getStyleClass().add("btn-dialog-cancel");
+        closeBtn.setOnAction(e -> ViewNavigator.hideOverlayDialog());
+        dialog.setFooterButtons(closeBtn);
+        dialog.show();
+    }
+
+    private void handleDeleteProduct(Product product) {
+        ViewNavigator.showConfirmDialog(
+                "Delete Product",
+                "Are you sure you want to delete '" + product.getName() + "'?\n\nThis item will be removed from the catalog and sell screen. Past sales and movement history will stay intact.",
+                "Delete Product",
+                () -> {
+                    AppExecutor.execute(() -> {
+                        try {
+                            productService.softDeleteProduct(product.getId(), currentUser);
+                            Platform.runLater(() -> {
+                                ViewNavigator.showToast("Product '" + product.getName() + "' deleted successfully.", false);
+                                loadInitialData();
+                            });
+                        } catch (Exception ex) {
+                            Platform.runLater(() -> ViewNavigator.showToast("Failed to delete product: " + ex.getMessage(), true));
                         }
                     });
                 }

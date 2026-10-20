@@ -100,6 +100,12 @@
     -fx-font-size: 16px;
     -fx-font-weight: 800;
     -fx-text-fill: #3B82F6;
+    -fx-cursor: hand;
+}
+
+.product-card-price:hover {
+    -fx-text-fill: #1D4ED8;
+    -fx-underline: true;
 }
 
 .product-card-stock {
@@ -249,41 +255,23 @@
     -fx-border-color: #BFDBFE;
 }
 
-/* Reason Selector */
-.reason-box {
-    -fx-spacing: 6;
-}
-
-.reason-chip {
-    -fx-background-color: #F1F5F9;
-    -fx-background-radius: 8;
-    -fx-text-fill: #475569;
-    -fx-font-size: 12px;
-    -fx-font-weight: 700;
-    -fx-padding: 8 10;
-    -fx-cursor: hand;
-}
-
-.reason-chip:hover {
-    -fx-background-color: #E2E8F0;
-}
-
-.reason-chip.selected {
-    -fx-background-color: #0F172A;
-    -fx-text-fill: white;
-}
-
-/* Keypad Quantity Display */
+/* Keypad Total Display */
 .keypad-display-box {
     -fx-background-color: #F8FAFC;
     -fx-background-radius: 10;
     -fx-border-color: #CBD5E1;
     -fx-border-width: 1.5;
     -fx-border-radius: 10;
-    -fx-padding: 10 16;
+    -fx-padding: 8 16;
     -fx-alignment: CENTER_RIGHT;
-    -fx-pref-height: 48px;
-    -fx-min-height: 48px;
+    -fx-min-height: 56px;
+}
+
+.keypad-expression-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #64748B;
+    -fx-alignment: CENTER_RIGHT;
 }
 
 .keypad-qty-label {
@@ -292,13 +280,27 @@
     -fx-text-fill: #64748B;
 }
 
+.keypad-preview-label {
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #2563EB;
+    -fx-padding: 0 4 0 0;
+}
+
 .keypad-qty-value {
-    -fx-font-size: 24px;
+    -fx-font-size: 20px;
     -fx-font-weight: 800;
     -fx-text-fill: #0F172A;
 }
 
-/* Touch Numeric Keypad */
+.keypad-error-label {
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #EF4444;
+    -fx-padding: 2 0 0 0;
+}
+
+/* Touch Numeric Keypad with Operators */
 .keypad-grid {
     -fx-hgap: 8;
     -fx-vgap: 8;
@@ -313,9 +315,8 @@
     -fx-font-size: 17px;
     -fx-font-weight: 700;
     -fx-text-fill: #0F172A;
-    -fx-pref-width: 105;
-    -fx-pref-height: 50;
-    -fx-min-height: 50;
+    -fx-pref-height: 44;
+    -fx-min-height: 44;
     -fx-cursor: hand;
     -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.04), 4, 0, 0, 1);
 }
@@ -334,6 +335,58 @@
     -fx-text-fill: #475569;
     -fx-font-size: 14px;
     -fx-font-weight: 700;
+}
+
+.btn-keypad-operator {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #CBD5E1;
+    -fx-text-fill: #1E293B;
+    -fx-font-size: 18px;
+    -fx-font-weight: 800;
+}
+
+.btn-keypad-operator:hover {
+    -fx-background-color: #E2E8F0;
+    -fx-border-color: #94A3B8;
+}
+
+.btn-keypad-operator:pressed {
+    -fx-background-color: #CBD5E1;
+}
+
+.btn-keypad-equals {
+    -fx-background-color: #2563EB;
+    -fx-border-color: #1D4ED8;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-text-fill: white;
+    -fx-font-size: 20px;
+    -fx-font-weight: 800;
+    -fx-pref-height: 40;
+    -fx-min-height: 40;
+    -fx-cursor: hand;
+}
+
+.btn-keypad-equals:hover {
+    -fx-background-color: #1D4ED8;
+}
+
+.btn-keypad-equals:pressed {
+    -fx-background-color: #1E40AF;
+}
+
+.product-card-total {
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+    -fx-text-fill: #2563EB;
+    -fx-padding: 2 0 0 0;
+}
+
+.product-card-stock-warning {
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #DC2626;
+    -fx-padding: 2 0 0 0;
 }
 
 /* Recent Deductions List (Session-based) */
@@ -383,63 +436,20 @@
     -fx-text-fill: #94A3B8;
 }
 
-.recent-item-row.undone .recent-item-text {
-    -fx-strikethrough: true;
-    -fx-text-fill: #94A3B8;
-}
-
-.btn-item-undo {
-    -fx-background-color: #EFF6FF;
-    -fx-border-color: #BFDBFE;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
-    -fx-padding: 3 8;
-    -fx-font-size: 11px;
-    -fx-font-weight: 700;
-    -fx-text-fill: #3B82F6;
-    -fx-cursor: hand;
-}
-
-.btn-item-undo:hover {
-    -fx-background-color: #DBEAFE;
-    -fx-border-color: #93C5FD;
-}
-
-.btn-item-undo:disabled {
-    -fx-background-color: #F1F5F9;
-    -fx-border-color: #E2E8F0;
-    -fx-text-fill: #94A3B8;
-    -fx-cursor: default;
-    -fx-opacity: 0.65;
-}
-
-/* Floating Toast with Undo */
+/* Compact Floating Toast */
 .toast-container {
     -fx-background-color: #0F172A;
-    -fx-background-radius: 12;
-    -fx-padding: 12 18;
-    -fx-spacing: 16;
-    -fx-alignment: CENTER_LEFT;
-    -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.35), 16, 0, 0, 6);
+    -fx-background-radius: 10;
+    -fx-padding: 10 20;
+    -fx-alignment: CENTER;
+    -fx-max-width: 360;
+    -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.35), 14, 0, 0, 4);
 }
 
 .toast-message {
-    -fx-font-size: 14px;
+    -fx-font-size: 13px;
     -fx-font-weight: 600;
     -fx-text-fill: white;
-}
-
-.btn-toast-undo {
-    -fx-background-color: #3B82F6;
-    -fx-background-radius: 6;
-    -fx-text-fill: white;
-    -fx-font-size: 13px;
-    -fx-font-weight: 800;
-    -fx-padding: 6 12;
-    -fx-cursor: hand;
-}
-
-.btn-toast-undo:hover {
-    -fx-background-color: #2563EB;
+    -fx-text-alignment: center;
 }
 

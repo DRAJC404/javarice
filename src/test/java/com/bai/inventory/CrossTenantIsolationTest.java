@@ -64,7 +64,13 @@ public class CrossTenantIsolationTest {
     private static void cleanupTestTenants() {
         try (Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/bai_pos", "postgres", "");
              Statement s = conn.createStatement()) {
+            s.executeUpdate("DELETE FROM product_submissions WHERE organization_id >= 2");
+            s.executeUpdate("DELETE FROM join_codes WHERE organization_id >= 2");
+            s.executeUpdate("DELETE FROM stock_counts WHERE organization_id >= 2");
+            s.executeUpdate("DELETE FROM ai_usage_tracking WHERE organization_id >= 2");
+            s.executeUpdate("DELETE FROM ai_insights WHERE organization_id >= 2");
             s.executeUpdate("DELETE FROM stock_movements WHERE organization_id >= 2");
+            s.executeUpdate("DELETE FROM product_history WHERE product_id IN (SELECT id FROM products WHERE organization_id >= 2) OR user_id IN (SELECT id FROM users WHERE organization_id >= 2)");
             s.executeUpdate("DELETE FROM products WHERE organization_id >= 2");
             s.executeUpdate("DELETE FROM categories WHERE organization_id >= 2");
             s.executeUpdate("DELETE FROM audit_log WHERE organization_id >= 2");

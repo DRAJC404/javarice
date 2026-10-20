@@ -44,25 +44,62 @@ public class ProductDao {
         return list;
     }
 
+    public boolean isCategoryNameTaken(String name, int organizationId) {
+        if (name == null || name.trim().isEmpty()) {
+            return false;
+        }
+        String cleanName = name.trim();
+        String sql = "SELECT 1 FROM categories WHERE organization_id = ? AND LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1";
+        try (Connection conn = DatabaseConfig.getConnection(organizationId);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, organizationId);
+            stmt.setString(2, cleanName);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return true;
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[ProductDao] Error checking duplicate category name: " + e.getMessage());
+        }
+
+        if (DatabaseConfig.isDevModeEnabled()) {
+            for (Category c : findAllCategories(organizationId)) {
+                if (c.getName() != null && c.getName().trim().equalsIgnoreCase(cleanName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public Category createCategory(String name, String description, int organizationId) throws SQLException {
+        String cleanName = name != null ? name.trim() : "";
+        if (isCategoryNameTaken(cleanName, organizationId)) {
+            throw new SQLException("A category with this name already exists.");
+        }
         String sql = "INSERT INTO categories (organization_id, name, description) VALUES (?, ?, ?) RETURNING id";
         try (Connection conn = DatabaseConfig.getConnection(organizationId);
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, organizationId);
-            stmt.setString(2, name);
-            stmt.setString(3, description != null ? description : "");
+            stmt.setString(2, cleanName);
+            stmt.setString(3, description != null ? description.trim() : "");
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    Category cat = new Category(rs.getInt("id"), name, description);
+                    Category cat = new Category(rs.getInt("id"), cleanName, description != null ? description.trim() : "");
                     conn.commit();
                     return cat;
                 }
             }
         } catch (SQLException e) {
             if ("23505".equals(e.getSQLState())) {
-                throw new SQLException("A category named '" + name + "' already exists in your business.", e.getSQLState(), e);
+                throw new SQLException("A category with this name already exists.", e.getSQLState(), e);
             }
             throw e;
+        }
+        if (DatabaseConfig.isDevModeEnabled()) {
+            int newId = (int) (System.currentTimeMillis() % 100000);
+            return new Category(newId, cleanName, description != null ? description.trim() : "");
         }
         throw new SQLException("Failed to create category");
     }
@@ -84,10 +121,10 @@ public class ProductDao {
         StringBuilder sql = new StringBuilder(
                 "SELECT p.id, p.organization_id, p.category_id, c.name AS category_name, p.sku, p.barcode, p.name, " +
                 "p.unit, p.cost_price, p.selling_price, p.stock_quantity, p.low_stock_threshold, " +
-                "p.image_path, p.status, p.is_archived, p.created_at, p.updated_at " +
+                "p.image_path, p.status, p.is_archived, p.approval_status, p.is_deleted, p.created_at, p.updated_at " +
                 "FROM products p " +
                 "LEFT JOIN categories c ON p.category_id = c.id " +
-                "WHERE p.organization_id = ? "
+                "WHERE p.organization_id = ? AND p.is_deleted = false AND p.approval_status = 'APPROVED' "
         );
 
         List<Object> params = new ArrayList<>();
@@ -140,9 +177,9 @@ public class ProductDao {
     public Optional<Product> findById(int id, int organizationId) {
         String sql = "SELECT p.id, p.organization_id, p.category_id, c.name AS category_name, p.sku, p.barcode, p.name, " +
                      "p.unit, p.cost_price, p.selling_price, p.stock_quantity, p.low_stock_threshold, " +
-                     "p.image_path, p.status, p.is_archived, p.created_at, p.updated_at " +
+                     "p.image_path, p.status, p.is_archived, p.approval_status, p.is_deleted, p.created_at, p.updated_at " +
                      "FROM products p LEFT JOIN categories c ON p.category_id = c.id " +
-                     "WHERE p.id = ? AND p.organization_id = ?";
+                     "WHERE p.id = ? AND p.organization_id = ? AND p.is_deleted = false";
 
         try (Connection conn = DatabaseConfig.getConnection(organizationId);
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -169,9 +206,9 @@ public class ProductDao {
 
         String sql = "SELECT p.id, p.organization_id, p.category_id, c.name AS category_name, p.sku, p.barcode, p.name, " +
                      "p.unit, p.cost_price, p.selling_price, p.stock_quantity, p.low_stock_threshold, " +
-                     "p.image_path, p.status, p.is_archived, p.created_at, p.updated_at " +
+                     "p.image_path, p.status, p.is_archived, p.approval_status, p.is_deleted, p.created_at, p.updated_at " +
                      "FROM products p LEFT JOIN categories c ON p.category_id = c.id " +
-                     "WHERE (p.barcode = ? OR LOWER(p.sku) = LOWER(?)) AND p.organization_id = ? AND p.is_archived = false";
+                     "WHERE (p.barcode = ? OR LOWER(p.sku) = LOWER(?)) AND p.organization_id = ? AND p.is_archived = false AND p.is_deleted = false AND p.approval_status = 'APPROVED'";
 
         try (Connection conn = DatabaseConfig.getConnection(organizationId);
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -198,9 +235,9 @@ public class ProductDao {
         List<Product> list = new ArrayList<>();
         String sql = "SELECT p.id, p.organization_id, p.category_id, c.name AS category_name, p.sku, p.barcode, p.name, " +
                      "p.unit, p.cost_price, p.selling_price, p.stock_quantity, p.low_stock_threshold, " +
-                     "p.image_path, p.status, p.is_archived, p.created_at, p.updated_at " +
+                     "p.image_path, p.status, p.is_archived, p.approval_status, p.is_deleted, p.created_at, p.updated_at " +
                      "FROM products p LEFT JOIN categories c ON p.category_id = c.id " +
-                     "WHERE p.organization_id = ? AND p.is_archived = false AND (p.stock_quantity <= p.low_stock_threshold OR p.stock_quantity = 0) " +
+                     "WHERE p.organization_id = ? AND p.is_archived = false AND p.is_deleted = false AND p.approval_status = 'APPROVED' AND (p.stock_quantity <= p.low_stock_threshold OR p.stock_quantity = 0) " +
                      "ORDER BY (p.low_stock_threshold - p.stock_quantity) DESC, p.stock_quantity ASC " +
                      "LIMIT ?";
 
@@ -243,7 +280,7 @@ public class ProductDao {
                      "COUNT(CASE WHEN stock_quantity <= low_stock_threshold AND stock_quantity > 0 THEN 1 END) AS low_stock_count, " +
                      "COUNT(CASE WHEN stock_quantity = 0 THEN 1 END) AS out_of_stock_count, " +
                      "COALESCE(SUM(stock_quantity * selling_price), 0) AS total_valuation " +
-                     "FROM products WHERE organization_id = ? AND is_archived = false";
+                     "FROM products WHERE organization_id = ? AND is_archived = false AND is_deleted = false AND approval_status = 'APPROVED'";
 
         try (Connection conn = DatabaseConfig.getConnection(organizationId);
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -266,9 +303,9 @@ public class ProductDao {
     }
 
     public Product createProduct(Product product, int organizationId, int userId) throws SQLException {
-        String insertProdSql = "INSERT INTO products (organization_id, category_id, sku, barcode, name, unit, cost_price, selling_price, stock_quantity, low_stock_threshold, image_path, status, is_archived) " +
-                               "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false) " +
-                               "RETURNING id, organization_id, category_id, sku, barcode, name, unit, cost_price, selling_price, stock_quantity, low_stock_threshold, image_path, status, is_archived, created_at, updated_at";
+        String insertProdSql = "INSERT INTO products (organization_id, category_id, sku, barcode, name, unit, cost_price, selling_price, stock_quantity, low_stock_threshold, image_path, status, is_archived, approval_status, is_deleted) " +
+                               "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?, false) " +
+                               "RETURNING id, organization_id, category_id, sku, barcode, name, unit, cost_price, selling_price, stock_quantity, low_stock_threshold, image_path, status, is_archived, approval_status, is_deleted, created_at, updated_at";
 
         String insertMovementSql = "INSERT INTO stock_movements (organization_id, reference_no, product_id, user_id, movement_type, quantity, reason, previous_stock, new_stock, notes) " +
                                    "VALUES (?, ?, ?, ?, 'IN', ?, 'OPENING_STOCK', 0, ?, ?)";
@@ -287,13 +324,14 @@ public class ProductDao {
                     stmt.setString(3, product.getSku().trim());
                     stmt.setString(4, product.getBarcode() != null && !product.getBarcode().trim().isEmpty() ? product.getBarcode().trim() : null);
                     stmt.setString(5, product.getName().trim());
-                    stmt.setString(6, product.getUnit() != null ? product.getUnit().trim() : "pcs");
+                    stmt.setString(6, com.bai.inventory.util.Constants.UNIT);
                     stmt.setBigDecimal(7, product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO);
                     stmt.setBigDecimal(8, product.getSellingPrice() != null ? product.getSellingPrice() : BigDecimal.ZERO);
                     stmt.setInt(9, product.getStockQuantity());
                     stmt.setInt(10, product.getLowStockThreshold());
                     stmt.setString(11, product.getImagePath());
                     stmt.setString(12, product.getStatus() != null ? product.getStatus() : "IN_STOCK");
+                    stmt.setString(13, product.getApprovalStatus() != null ? product.getApprovalStatus() : "APPROVED");
 
                     try (ResultSet rs = stmt.executeQuery()) {
                         if (rs.next()) {
@@ -332,7 +370,7 @@ public class ProductDao {
                      "category_id = ?, barcode = ?, name = ?, unit = ?, " +
                      "cost_price = ?, selling_price = ?, low_stock_threshold = ?, " +
                      "image_path = ?, updated_at = CURRENT_TIMESTAMP " +
-                     "WHERE id = ? AND organization_id = ?";
+                     "WHERE id = ? AND organization_id = ? AND is_deleted = false";
 
         try (Connection conn = DatabaseConfig.getConnection(organizationId);
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -343,13 +381,38 @@ public class ProductDao {
             }
             stmt.setString(2, product.getBarcode() != null && !product.getBarcode().trim().isEmpty() ? product.getBarcode().trim() : null);
             stmt.setString(3, product.getName().trim());
-            stmt.setString(4, product.getUnit() != null ? product.getUnit().trim() : "pcs");
+            stmt.setString(4, com.bai.inventory.util.Constants.UNIT);
             stmt.setBigDecimal(5, product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO);
             stmt.setBigDecimal(6, product.getSellingPrice() != null ? product.getSellingPrice() : BigDecimal.ZERO);
             stmt.setInt(7, product.getLowStockThreshold());
             stmt.setString(8, product.getImagePath());
             stmt.setInt(9, product.getId());
             stmt.setInt(10, organizationId);
+            boolean updated = stmt.executeUpdate() > 0;
+            conn.commit();
+            return updated;
+        }
+    }
+
+    public boolean softDelete(int id, int organizationId) throws SQLException {
+        String sql = "UPDATE products SET is_deleted = true, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND organization_id = ?";
+        try (Connection conn = DatabaseConfig.getConnection(organizationId);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, id);
+            stmt.setInt(2, organizationId);
+            boolean deleted = stmt.executeUpdate() > 0;
+            conn.commit();
+            return deleted;
+        }
+    }
+
+    public boolean updateApprovalStatus(int productId, String approvalStatus, int organizationId) throws SQLException {
+        String sql = "UPDATE products SET approval_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND organization_id = ?";
+        try (Connection conn = DatabaseConfig.getConnection(organizationId);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, approvalStatus);
+            stmt.setInt(2, productId);
+            stmt.setInt(3, organizationId);
             boolean updated = stmt.executeUpdate() > 0;
             conn.commit();
             return updated;
@@ -425,6 +488,12 @@ public class ProductDao {
         try {
             p.setCategoryName(rs.getString("category_name"));
         } catch (SQLException ignored) {}
+        try {
+            p.setApprovalStatus(rs.getString("approval_status"));
+        } catch (SQLException ignored) {}
+        try {
+            p.setDeleted(rs.getBoolean("is_deleted"));
+        } catch (SQLException ignored) {}
 
         Timestamp cat = rs.getTimestamp("created_at");
         if (cat != null) p.setCreatedAt(cat.toLocalDateTime());
@@ -481,16 +550,16 @@ public class ProductDao {
 
     private List<Product> getDemoProducts(String searchQuery, Integer categoryId) {
         List<Product> demo = List.of(
-                new Product(1, 1, "BEV-001", "8901001", "Barako Arabica Beans 1kg", "bag", new BigDecimal("380.00"), new BigDecimal("650.00"), 42, 15, null, "IN_STOCK"),
-                new Product(2, 1, "BEV-002", "8901002", "Benguet Cold Brew Keg 20L", "keg", new BigDecimal("1200.00"), new BigDecimal("2400.00"), 3, 4, null, "LOW_STOCK"),
-                new Product(3, 1, "BEV-003", "8901003", "Ceremonial Matcha Tin 100g", "tin", new BigDecimal("450.00"), new BigDecimal("850.00"), 6, 10, null, "LOW_STOCK"),
-                new Product(4, 2, "BAK-001", "8902001", "Butter Croissant (Box of 6)", "box", new BigDecimal("160.00"), new BigDecimal("320.00"), 8, 12, null, "LOW_STOCK"),
-                new Product(5, 2, "BAK-002", "8902002", "Special Ensaymada (4pk)", "box", new BigDecimal("140.00"), new BigDecimal("280.00"), 18, 10, null, "IN_STOCK"),
-                new Product(6, 2, "BAK-003", "8902003", "Almond Danish Pack (4pk)", "box", new BigDecimal("150.00"), new BigDecimal("300.00"), 0, 6, null, "OUT_OF_STOCK"),
-                new Product(7, 3, "DAI-001", "8904001", "Fresh Whole Milk 1L", "carton", new BigDecimal("65.00"), new BigDecimal("110.00"), 7, 20, null, "LOW_STOCK"),
-                new Product(8, 3, "DAI-002", "8904002", "Barista Oat Milk 1L", "carton", new BigDecimal("95.00"), new BigDecimal("175.00"), 35, 15, null, "IN_STOCK"),
-                new Product(9, 4, "SNK-001", "8903001", "Roast Chicken Pesto Ciabatta", "pcs", new BigDecimal("90.00"), new BigDecimal("185.00"), 14, 10, null, "IN_STOCK"),
-                new Product(10, 5, "SUP-001", "8905001", "Eco Paper Cups 12oz (50s)", "sleeve", new BigDecimal("75.00"), new BigDecimal("140.00"), 55, 20, null, "IN_STOCK")
+                new Product(1, 1, "BEV-001", "8901001", "Barako Arabica Beans 1kg", com.bai.inventory.util.Constants.UNIT, new BigDecimal("380.00"), new BigDecimal("650.00"), 42, 15, null, "IN_STOCK"),
+                new Product(2, 1, "BEV-002", "8901002", "Benguet Cold Brew Keg 20L", com.bai.inventory.util.Constants.UNIT, new BigDecimal("1200.00"), new BigDecimal("2400.00"), 3, 4, null, "LOW_STOCK"),
+                new Product(3, 1, "BEV-003", "8901003", "Ceremonial Matcha Tin 100g", com.bai.inventory.util.Constants.UNIT, new BigDecimal("450.00"), new BigDecimal("850.00"), 6, 10, null, "LOW_STOCK"),
+                new Product(4, 2, "BAK-001", "8902001", "Butter Croissant (Box of 6)", com.bai.inventory.util.Constants.UNIT, new BigDecimal("160.00"), new BigDecimal("320.00"), 8, 12, null, "LOW_STOCK"),
+                new Product(5, 2, "BAK-002", "8902002", "Special Ensaymada (4pk)", com.bai.inventory.util.Constants.UNIT, new BigDecimal("140.00"), new BigDecimal("280.00"), 18, 10, null, "IN_STOCK"),
+                new Product(6, 2, "BAK-003", "8902003", "Almond Danish Pack (4pk)", com.bai.inventory.util.Constants.UNIT, new BigDecimal("150.00"), new BigDecimal("300.00"), 0, 6, null, "OUT_OF_STOCK"),
+                new Product(7, 3, "DAI-001", "8904001", "Fresh Whole Milk 1L", com.bai.inventory.util.Constants.UNIT, new BigDecimal("65.00"), new BigDecimal("110.00"), 7, 20, null, "LOW_STOCK"),
+                new Product(8, 3, "DAI-002", "8904002", "Barista Oat Milk 1L", com.bai.inventory.util.Constants.UNIT, new BigDecimal("95.00"), new BigDecimal("175.00"), 35, 15, null, "IN_STOCK"),
+                new Product(9, 4, "SNK-001", "8903001", "Roast Chicken Pesto Ciabatta", com.bai.inventory.util.Constants.UNIT, new BigDecimal("90.00"), new BigDecimal("185.00"), 14, 10, null, "IN_STOCK"),
+                new Product(10, 5, "SUP-001", "8905001", "Eco Paper Cups 12oz (50s)", com.bai.inventory.util.Constants.UNIT, new BigDecimal("75.00"), new BigDecimal("140.00"), 55, 20, null, "IN_STOCK")
         );
 
         List<Product> filtered = new ArrayList<>();

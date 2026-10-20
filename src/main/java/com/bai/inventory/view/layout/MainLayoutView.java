@@ -11,6 +11,10 @@ import com.bai.inventory.view.pages.DashboardView;
 import com.bai.inventory.view.pages.InventoryView;
 import com.bai.inventory.view.pages.ProductCatalogView;
 import com.bai.inventory.view.pages.TeamView;
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -24,6 +28,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
 import javafx.scene.shape.SVGPath;
+import javafx.util.Duration;
 
 import java.io.InputStream;
 import java.util.LinkedHashMap;
@@ -38,9 +43,12 @@ public class MainLayoutView extends StackPane implements Disposable {
     private static final String SVG_ANALYTICS = "M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z";
     private static final String SVG_INSIGHTS  = "M12 2L9.5 8.5 3 11l6.5 2.5L12 20l2.5-6.5L21 11l-6.5-2.5z";
     private static final String SVG_REPORTS   = "M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z";
+    private static final String SVG_PRODUCT_REVIEW = "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z";
     private static final String SVG_USERS     = "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z";
     private static final String SVG_LOGOUT    = "M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z";
-    private static final String SVG_PLUS      = "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z";
+
+    private static final double SIDEBAR_EXPANDED_WIDTH = 250.0;
+    private static final double SIDEBAR_COLLAPSED_WIDTH = 72.0;
 
     private final BorderPane mainBorderPane;
     private final BorderPane contentArea;
@@ -51,13 +59,27 @@ public class MainLayoutView extends StackPane implements Disposable {
     private final Region drawerBackdrop;
 
     private VBox sidebarBox;
+    private VBox brandBox;
+    private HBox headerRow;
+    private Button sidebarHamburgerBtn;
+    private HBox logoRow;
+    private ImageView logoImg;
     private Label brandTitle;
     private Label tagBadge;
+    private VBox navContainer;
     private Node userDetailsBox;
     private Label logoutTextLabel;
-    private Button addTeamNavBtn;
+    private VBox userFooterBox;
+    private HBox profileRow;
+    private HBox logoutContentBox;
+    private Button sidebarLogoutBtn;
     private Label teamBadgeLabel;
+    private Region teamBadgeSpacer;
+    private Label reviewBadgeLabel;
+    private Region reviewBadgeSpacer;
+    private Timeline sidebarAnimation;
     private final com.bai.inventory.dao.JoinCodeDao joinCodeDao = new com.bai.inventory.dao.JoinCodeDao();
+    private final com.bai.inventory.dao.ProductSubmissionDao submissionDao = new com.bai.inventory.dao.ProductSubmissionDao();
 
     private final Map<ViewType, Button> navButtons = new LinkedHashMap<>();
     private final Map<ViewType, Label> navLabels = new LinkedHashMap<>();
@@ -122,6 +144,7 @@ public class MainLayoutView extends StackPane implements Disposable {
 
         selectView(initialView != null ? initialView : ViewType.DASHBOARD);
         refreshTeamBadge();
+        refreshReviewBadge();
     }
 
     private Node buildTopNavbar() {
@@ -130,33 +153,12 @@ public class MainLayoutView extends StackPane implements Disposable {
 
         HBox leftSection = new HBox(16);
         leftSection.setAlignment(Pos.CENTER_LEFT);
-
-        Button hamburgerBtn = new Button();
-        hamburgerBtn.getStyleClass().add("top-navbar-hamburger");
-        SVGPath hamburgerIcon = new SVGPath();
-        hamburgerIcon.setContent(SVG_HAMBURGER);
-        hamburgerIcon.getStyleClass().add("top-navbar-icon");
-        hamburgerBtn.setGraphic(hamburgerIcon);
-        hamburgerBtn.setTooltip(new Tooltip("Toggle navigation menu"));
-        hamburgerBtn.setOnAction(e -> handleHamburgerClick());
-
-        leftSection.getChildren().addAll(hamburgerBtn, pageTitleLabel);
+        leftSection.getChildren().add(pageTitleLabel);
         navbar.setLeft(leftSection);
 
         User currentUser = AuthService.getCurrentUser();
         HBox rightSection = new HBox(12);
         rightSection.setAlignment(Pos.CENTER_RIGHT);
-
-        if (currentUser != null && currentUser.getRole() == Role.OWNER) {
-            addTeamNavBtn = new Button("Add team member");
-            addTeamNavBtn.getStyleClass().add("btn-primary");
-            SVGPath plusIcon = new SVGPath();
-            plusIcon.setContent(SVG_PLUS);
-            plusIcon.getStyleClass().add("sidebar-item-icon");
-            addTeamNavBtn.setGraphic(plusIcon);
-            addTeamNavBtn.setOnAction(e -> com.bai.inventory.view.dialog.JoinCodeDialogHelper.showAddTeamMemberModal(this::refreshTeamBadge));
-            rightSection.getChildren().add(addTeamNavBtn);
-        }
 
         Node userMenu = buildUserTopMenu(currentUser);
         rightSection.getChildren().add(userMenu);
@@ -164,8 +166,6 @@ public class MainLayoutView extends StackPane implements Disposable {
 
         return navbar;
     }
-
-    private Button sidebarLogoutBtn;
 
     private Node buildUserTopMenu(User user) {
         HBox userBox = new HBox(12);
@@ -194,19 +194,52 @@ public class MainLayoutView extends StackPane implements Disposable {
     private VBox buildSidebar() {
         sidebarBox = new VBox();
         sidebarBox.getStyleClass().add("sidebar");
-        sidebarBox.setPrefWidth(250);
-        sidebarBox.setMinWidth(250);
+        sidebarBox.setPrefWidth(SIDEBAR_EXPANDED_WIDTH);
+        sidebarBox.setMinWidth(SIDEBAR_COLLAPSED_WIDTH);
+        sidebarBox.setMaxWidth(SIDEBAR_EXPANDED_WIDTH);
 
-        VBox brandBox = new VBox(8);
+        brandBox = new VBox();
         brandBox.getStyleClass().add("sidebar-brand-box");
 
-        HBox logoRow = new HBox(10);
+        headerRow = new HBox(10);
+        headerRow.setAlignment(Pos.CENTER_LEFT);
+
+        sidebarHamburgerBtn = new Button();
+        sidebarHamburgerBtn.getStyleClass().addAll("sidebar-hamburger-btn", "sidebar-nav-button");
+        sidebarHamburgerBtn.setMinSize(44, 44);
+        sidebarHamburgerBtn.setPrefSize(44, 44);
+        sidebarHamburgerBtn.setMaxSize(44, 44);
+        sidebarHamburgerBtn.setAlignment(Pos.CENTER);
+
+        StackPane burgerIconBox = new StackPane();
+        burgerIconBox.getStyleClass().addAll("sidebar-icon-box", "sidebar-nav-icon");
+        burgerIconBox.setMinSize(22, 22);
+        burgerIconBox.setPrefSize(22, 22);
+        burgerIconBox.setMaxSize(22, 22);
+        burgerIconBox.setAlignment(Pos.CENTER);
+
+        SVGPath burgerIcon = new SVGPath();
+        burgerIcon.setContent(SVG_HAMBURGER);
+        burgerIcon.getStyleClass().add("sidebar-item-icon");
+        burgerIconBox.getChildren().add(burgerIcon);
+        sidebarHamburgerBtn.setGraphic(burgerIconBox);
+
+        sidebarHamburgerBtn.setTooltip(new Tooltip(userDesktopExpanded ? "Collapse menu" : "Expand menu"));
+        sidebarHamburgerBtn.setOnAction(e -> handleHamburgerClick());
+        sidebarHamburgerBtn.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) {
+                handleHamburgerClick();
+                event.consume();
+            }
+        });
+
+        logoRow = new HBox(8);
         logoRow.setAlignment(Pos.CENTER_LEFT);
 
         try (InputStream is = getClass().getResourceAsStream("/images/bailogo.png")) {
             if (is != null) {
-                ImageView logoImg = new ImageView(new Image(is));
-                logoImg.setFitHeight(36);
+                logoImg = new ImageView(new Image(is));
+                logoImg.setFitHeight(28);
                 logoImg.setPreserveRatio(true);
                 logoRow.getChildren().add(logoImg);
             }
@@ -219,16 +252,28 @@ public class MainLayoutView extends StackPane implements Disposable {
         tagBadge.getStyleClass().add("sidebar-logo-tag");
 
         logoRow.getChildren().addAll(brandTitle, tagBadge);
-        brandBox.getChildren().add(logoRow);
 
-        VBox navContainer = new VBox(6);
+        headerRow.getChildren().addAll(sidebarHamburgerBtn, logoRow);
+        brandBox.getChildren().add(headerRow);
+
+        navContainer = new VBox(6);
         navContainer.getStyleClass().add("sidebar-nav-container");
 
         User currentUser = AuthService.getCurrentUser();
         boolean isOwner = (currentUser != null && currentUser.getRole() == Role.OWNER);
+        boolean isManagerOrAbove = (currentUser != null && currentUser.getRole() != null && currentUser.getRole().isManagerOrAbove());
 
         addNavItem(navContainer, ViewType.DASHBOARD, "Dashboard", SVG_DASHBOARD);
         addNavItem(navContainer, ViewType.PRODUCT, "Products", SVG_PRODUCTS);
+
+        if (isManagerOrAbove) {
+            reviewBadgeLabel = new Label();
+            reviewBadgeLabel.getStyleClass().add("join-code-badge");
+            reviewBadgeLabel.setVisible(false);
+            reviewBadgeLabel.setManaged(false);
+            addNavItem(navContainer, ViewType.PRODUCT_REVIEW, "Product Review", SVG_PRODUCT_REVIEW, reviewBadgeLabel);
+        }
+
         addNavItem(navContainer, ViewType.INVENTORY, "Inventory", SVG_INVENTORY);
 
         if (isOwner) {
@@ -241,7 +286,10 @@ public class MainLayoutView extends StackPane implements Disposable {
 
         addNavItem(navContainer, ViewType.ANALYTICS, "Analytics", SVG_ANALYTICS);
         addNavItem(navContainer, ViewType.AI_INSIGHTS, "AI Insights", SVG_INSIGHTS);
-        addNavItem(navContainer, ViewType.REPORT, "Reports", SVG_REPORTS);
+
+        if (currentUser != null && currentUser.getRole() != Role.EMPLOYEE) {
+            addNavItem(navContainer, ViewType.REPORT, "Reports", SVG_REPORTS);
+        }
 
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
@@ -258,15 +306,22 @@ public class MainLayoutView extends StackPane implements Disposable {
 
     private void addNavItem(VBox container, ViewType type, String labelText, String svgPath, Node badge) {
         Button btn = new Button();
-        btn.getStyleClass().add("sidebar-item");
+        btn.getStyleClass().addAll("sidebar-item", "sidebar-nav-button");
         btn.setMaxWidth(Double.MAX_VALUE);
+        btn.setMinHeight(44);
+        btn.setPrefHeight(44);
+        btn.setMaxHeight(44);
         btn.setAlignment(Pos.CENTER_LEFT);
 
         HBox row = new HBox(12);
         row.setAlignment(Pos.CENTER_LEFT);
 
         StackPane iconBox = new StackPane();
-        iconBox.getStyleClass().add("sidebar-icon-box");
+        iconBox.getStyleClass().addAll("sidebar-icon-box", "sidebar-nav-icon");
+        iconBox.setMinSize(22, 22);
+        iconBox.setPrefSize(22, 22);
+        iconBox.setMaxSize(22, 22);
+        iconBox.setAlignment(Pos.CENTER);
 
         SVGPath icon = new SVGPath();
         icon.setContent(svgPath);
@@ -280,9 +335,14 @@ public class MainLayoutView extends StackPane implements Disposable {
         row.getChildren().addAll(iconBox, label);
 
         if (badge != null) {
-            Region rowSpacer = new Region();
-            HBox.setHgrow(rowSpacer, Priority.ALWAYS);
-            row.getChildren().addAll(rowSpacer, badge);
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            if (badge == teamBadgeLabel) {
+                teamBadgeSpacer = spacer;
+            } else if (badge == reviewBadgeLabel) {
+                reviewBadgeSpacer = spacer;
+            }
+            row.getChildren().addAll(spacer, badge);
         }
 
         btn.setGraphic(row);
@@ -300,10 +360,10 @@ public class MainLayoutView extends StackPane implements Disposable {
     }
 
     private Node buildUserFooter(User user) {
-        VBox footer = new VBox(12);
-        footer.getStyleClass().add("sidebar-footer");
+        userFooterBox = new VBox(12);
+        userFooterBox.getStyleClass().add("sidebar-footer");
 
-        HBox profileRow = new HBox(12);
+        profileRow = new HBox(12);
         profileRow.setAlignment(Pos.CENTER_LEFT);
 
         String fullName = (user != null && user.getFullName() != null) ? user.getFullName() : "Administrator";
@@ -325,80 +385,304 @@ public class MainLayoutView extends StackPane implements Disposable {
 
         profileRow.getChildren().addAll(avatar, userDetails);
 
-        Button logoutBtn = new Button();
-        logoutBtn.getStyleClass().add("sidebar-logout-btn");
-        logoutBtn.setMaxWidth(Double.MAX_VALUE);
-        this.sidebarLogoutBtn = logoutBtn;
+        sidebarLogoutBtn = new Button();
+        sidebarLogoutBtn.getStyleClass().addAll("sidebar-logout-btn", "sidebar-nav-button");
+        sidebarLogoutBtn.setMaxWidth(Double.MAX_VALUE);
 
-        HBox logoutContent = new HBox(8);
-        logoutContent.setAlignment(Pos.CENTER);
+        logoutContentBox = new HBox(8);
+        logoutContentBox.setAlignment(Pos.CENTER);
+
+        StackPane logoutIconBox = new StackPane();
+        logoutIconBox.getStyleClass().addAll("sidebar-icon-box", "sidebar-nav-icon");
+        logoutIconBox.setMinSize(22, 22);
+        logoutIconBox.setPrefSize(22, 22);
+        logoutIconBox.setMaxSize(22, 22);
+        logoutIconBox.setAlignment(Pos.CENTER);
 
         SVGPath logoutIcon = new SVGPath();
         logoutIcon.setContent(SVG_LOGOUT);
         logoutIcon.getStyleClass().add("dialog-close-icon");
+        logoutIconBox.getChildren().add(logoutIcon);
 
         logoutTextLabel = new Label("Sign Out");
         logoutTextLabel.getStyleClass().add("sidebar-user-role");
 
-        logoutContent.getChildren().addAll(logoutIcon, logoutTextLabel);
-        logoutBtn.setGraphic(logoutContent);
-        logoutBtn.setOnAction(e -> ViewNavigator.showConfirmDialog(
+        logoutContentBox.getChildren().addAll(logoutIconBox, logoutTextLabel);
+        sidebarLogoutBtn.setGraphic(logoutContentBox);
+        sidebarLogoutBtn.setOnAction(e -> ViewNavigator.showConfirmDialog(
                 "Sign out?",
                 "You will need to sign in again to continue.",
                 "Sign out",
                 ViewNavigator::logout
         ));
 
-        footer.getChildren().addAll(profileRow, logoutBtn);
-        return footer;
+        userFooterBox.getChildren().addAll(profileRow, sidebarLogoutBtn);
+        return userFooterBox;
     }
 
     private void handleHamburgerClick() {
-        if (isNarrowMode) {
-            if (drawerOverlay.isVisible()) {
-                closeDrawer();
-            } else {
-                openDrawer();
+        userDesktopExpanded = !userDesktopExpanded;
+        animateSidebar(userDesktopExpanded);
+    }
+
+    private void animateSidebar(boolean expand) {
+        if (sidebarAnimation != null) {
+            sidebarAnimation.stop();
+        }
+
+        double startWidth = sidebarBox.getWidth() > 0 ? sidebarBox.getWidth() : (expand ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH);
+        double targetWidth = expand ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+
+        if (expand) {
+            setSidebarCollapsedState(false);
+            setLabelsVisible(false);
+        } else {
+            setLabelsVisible(false);
+            setSidebarCollapsedState(true);
+        }
+
+        sidebarAnimation = new Timeline(
+                new KeyFrame(Duration.ZERO,
+                        new KeyValue(sidebarBox.prefWidthProperty(), startWidth, Interpolator.EASE_BOTH),
+                        new KeyValue(sidebarBox.minWidthProperty(), startWidth, Interpolator.EASE_BOTH),
+                        new KeyValue(sidebarBox.maxWidthProperty(), startWidth, Interpolator.EASE_BOTH)
+                ),
+                new KeyFrame(Duration.millis(200),
+                        new KeyValue(sidebarBox.prefWidthProperty(), targetWidth, Interpolator.EASE_BOTH),
+                        new KeyValue(sidebarBox.minWidthProperty(), targetWidth, Interpolator.EASE_BOTH),
+                        new KeyValue(sidebarBox.maxWidthProperty(), targetWidth, Interpolator.EASE_BOTH)
+                )
+        );
+
+        sidebarAnimation.setOnFinished(e -> {
+            sidebarBox.setPrefWidth(targetWidth);
+            sidebarBox.setMinWidth(targetWidth);
+            sidebarBox.setMaxWidth(targetWidth);
+            if (expand) {
+                setLabelsVisible(true);
+            }
+        });
+
+        sidebarAnimation.play();
+    }
+
+    private void setLabelsVisible(boolean visible) {
+        if (brandTitle != null) {
+            brandTitle.setVisible(visible);
+            brandTitle.setManaged(visible);
+        }
+        if (tagBadge != null) {
+            tagBadge.setVisible(visible);
+            tagBadge.setManaged(visible);
+        }
+        if (logoImg != null) {
+            logoImg.setVisible(visible);
+            logoImg.setManaged(visible);
+        }
+        if (logoRow != null) {
+            logoRow.setVisible(visible);
+            logoRow.setManaged(visible);
+        }
+        navLabels.values().forEach(lbl -> {
+            lbl.setVisible(visible);
+            lbl.setManaged(visible);
+        });
+        if (userDetailsBox != null) {
+            userDetailsBox.setVisible(visible);
+            userDetailsBox.setManaged(visible);
+        }
+        if (logoutTextLabel != null) {
+            logoutTextLabel.setVisible(visible);
+            logoutTextLabel.setManaged(visible);
+        }
+        if (teamBadgeLabel != null) {
+            boolean show = visible && teamBadgeLabel.getText() != null && !teamBadgeLabel.getText().isEmpty();
+            teamBadgeLabel.setVisible(show);
+            teamBadgeLabel.setManaged(show);
+            if (teamBadgeSpacer != null) {
+                teamBadgeSpacer.setVisible(show);
+                teamBadgeSpacer.setManaged(show);
+            }
+        }
+        if (reviewBadgeLabel != null) {
+            boolean show = visible && reviewBadgeLabel.getText() != null && !reviewBadgeLabel.getText().isEmpty();
+            reviewBadgeLabel.setVisible(show);
+            reviewBadgeLabel.setManaged(show);
+            if (reviewBadgeSpacer != null) {
+                reviewBadgeSpacer.setVisible(show);
+                reviewBadgeSpacer.setManaged(show);
+            }
+        }
+    }
+
+    private void setSidebarCollapsedState(boolean collapsed) {
+        if (collapsed) {
+            if (teamBadgeSpacer != null) {
+                teamBadgeSpacer.setVisible(false);
+                teamBadgeSpacer.setManaged(false);
+            }
+            if (reviewBadgeSpacer != null) {
+                reviewBadgeSpacer.setVisible(false);
+                reviewBadgeSpacer.setManaged(false);
+            }
+            if (teamBadgeLabel != null) {
+                teamBadgeLabel.setVisible(false);
+                teamBadgeLabel.setManaged(false);
+            }
+            if (reviewBadgeLabel != null) {
+                reviewBadgeLabel.setVisible(false);
+                reviewBadgeLabel.setManaged(false);
+            }
+            if (!sidebarBox.getStyleClass().contains("sidebar-collapsed")) {
+                sidebarBox.getStyleClass().add("sidebar-collapsed");
+            }
+            if (sidebarHamburgerBtn != null) {
+                sidebarHamburgerBtn.setTooltip(new Tooltip("Expand menu"));
+            }
+            if (brandBox != null) {
+                brandBox.setAlignment(Pos.CENTER);
+            }
+            if (headerRow != null) {
+                headerRow.setAlignment(Pos.CENTER);
+                headerRow.setSpacing(0);
+            }
+            if (logoRow != null) {
+                logoRow.setVisible(false);
+                logoRow.setManaged(false);
+            }
+            if (navContainer != null) {
+                navContainer.setAlignment(Pos.TOP_CENTER);
+                navContainer.setFillWidth(false);
+            }
+            navButtons.forEach((type, btn) -> {
+                btn.setMaxWidth(44);
+                btn.setPrefWidth(44);
+                btn.setMinWidth(44);
+                btn.setMinHeight(44);
+                btn.setPrefHeight(44);
+                btn.setMaxHeight(44);
+                btn.setAlignment(Pos.CENTER);
+                if (btn.getGraphic() instanceof HBox row) {
+                    row.setAlignment(Pos.CENTER);
+                    row.setSpacing(0);
+                }
+                Label label = navLabels.get(type);
+                if (label != null) {
+                    btn.setTooltip(new Tooltip(label.getText()));
+                }
+            });
+            if (userFooterBox != null) {
+                userFooterBox.setAlignment(Pos.TOP_CENTER);
+            }
+            if (profileRow != null) {
+                profileRow.setAlignment(Pos.CENTER);
+                profileRow.setSpacing(0);
+            }
+            if (sidebarLogoutBtn != null) {
+                sidebarLogoutBtn.setMaxWidth(44);
+                sidebarLogoutBtn.setPrefWidth(44);
+                sidebarLogoutBtn.setMinWidth(44);
+                sidebarLogoutBtn.setMinHeight(44);
+                sidebarLogoutBtn.setPrefHeight(44);
+                sidebarLogoutBtn.setMaxHeight(44);
+                sidebarLogoutBtn.setAlignment(Pos.CENTER);
+                sidebarLogoutBtn.setTooltip(new Tooltip("Sign Out"));
+            }
+            if (logoutContentBox != null) {
+                logoutContentBox.setAlignment(Pos.CENTER);
+                logoutContentBox.setSpacing(0);
             }
         } else {
-            userDesktopExpanded = !userDesktopExpanded;
-            applyDesktopSidebarState(userDesktopExpanded);
+            sidebarBox.getStyleClass().remove("sidebar-collapsed");
+            if (sidebarHamburgerBtn != null) {
+                sidebarHamburgerBtn.setTooltip(new Tooltip("Collapse menu"));
+            }
+            if (brandBox != null) {
+                brandBox.setAlignment(Pos.CENTER_LEFT);
+            }
+            if (headerRow != null) {
+                headerRow.setAlignment(Pos.CENTER_LEFT);
+                headerRow.setSpacing(10);
+            }
+            if (logoRow != null) {
+                logoRow.setVisible(true);
+                logoRow.setManaged(true);
+            }
+            if (navContainer != null) {
+                navContainer.setAlignment(Pos.TOP_LEFT);
+                navContainer.setFillWidth(true);
+            }
+            navButtons.forEach((type, btn) -> {
+                btn.setMaxWidth(Double.MAX_VALUE);
+                btn.setPrefWidth(Region.USE_COMPUTED_SIZE);
+                btn.setMinWidth(Region.USE_COMPUTED_SIZE);
+                btn.setMinHeight(44);
+                btn.setPrefHeight(44);
+                btn.setMaxHeight(44);
+                btn.setAlignment(Pos.CENTER_LEFT);
+                if (btn.getGraphic() instanceof HBox row) {
+                    row.setAlignment(Pos.CENTER_LEFT);
+                    row.setSpacing(12);
+                }
+                btn.setTooltip(null);
+            });
+            if (teamBadgeSpacer != null) {
+                boolean show = teamBadgeLabel != null && teamBadgeLabel.getText() != null && !teamBadgeLabel.getText().isEmpty();
+                teamBadgeSpacer.setVisible(show);
+                teamBadgeSpacer.setManaged(show);
+                if (teamBadgeLabel != null) {
+                    teamBadgeLabel.setVisible(show);
+                    teamBadgeLabel.setManaged(show);
+                }
+            }
+            if (reviewBadgeSpacer != null) {
+                boolean show = reviewBadgeLabel != null && reviewBadgeLabel.getText() != null && !reviewBadgeLabel.getText().isEmpty();
+                reviewBadgeSpacer.setVisible(show);
+                reviewBadgeSpacer.setManaged(show);
+                if (reviewBadgeLabel != null) {
+                    reviewBadgeLabel.setVisible(show);
+                    reviewBadgeLabel.setManaged(show);
+                }
+            }
+            if (userFooterBox != null) {
+                userFooterBox.setAlignment(Pos.CENTER_LEFT);
+            }
+            if (profileRow != null) {
+                profileRow.setAlignment(Pos.CENTER_LEFT);
+                profileRow.setSpacing(12);
+            }
+            if (sidebarLogoutBtn != null) {
+                sidebarLogoutBtn.setMaxWidth(Double.MAX_VALUE);
+                sidebarLogoutBtn.setPrefWidth(Region.USE_COMPUTED_SIZE);
+                sidebarLogoutBtn.setMinWidth(Region.USE_COMPUTED_SIZE);
+                sidebarLogoutBtn.setMinHeight(36);
+                sidebarLogoutBtn.setPrefHeight(36);
+                sidebarLogoutBtn.setMaxHeight(36);
+                sidebarLogoutBtn.setAlignment(Pos.CENTER);
+                sidebarLogoutBtn.setTooltip(null);
+            }
+            if (logoutContentBox != null) {
+                logoutContentBox.setAlignment(Pos.CENTER);
+                logoutContentBox.setSpacing(8);
+            }
         }
     }
 
     private void handleResponsiveLayout(double width) {
-        if (addTeamNavBtn != null) {
-            if (width < 800) {
-                addTeamNavBtn.setText("");
-                addTeamNavBtn.setTooltip(new Tooltip("Add team member"));
-            } else {
-                addTeamNavBtn.setText("Add team member");
-                addTeamNavBtn.setTooltip(null);
+        if (mainBorderPane.getLeft() != sidebarBox) {
+            if (sidebarBox.getParent() instanceof Pane parentPane) {
+                parentPane.getChildren().remove(sidebarBox);
             }
+            mainBorderPane.setLeft(sidebarBox);
         }
+        closeDrawer();
 
-        if (width < 1180) {
+        if (width < 1050) {
             isNarrowMode = true;
-            if (mainBorderPane.getLeft() == sidebarBox) {
-                mainBorderPane.setLeft(null);
-            }
-            if (sidebarBox.getParent() != drawerOverlay) {
-                if (sidebarBox.getParent() instanceof Pane parentPane) {
-                    parentPane.getChildren().remove(sidebarBox);
-                }
-                drawerOverlay.getChildren().setAll(drawerBackdrop, sidebarBox);
-                StackPane.setAlignment(sidebarBox, Pos.CENTER_LEFT);
-            }
-            applyDesktopSidebarState(true);
+            userDesktopExpanded = false;
+            applyDesktopSidebarState(false);
         } else {
             isNarrowMode = false;
-            closeDrawer();
-            if (sidebarBox.getParent() != mainBorderPane) {
-                if (sidebarBox.getParent() instanceof Pane parentPane) {
-                    parentPane.getChildren().remove(sidebarBox);
-                }
-                mainBorderPane.setLeft(sidebarBox);
-            }
             applyDesktopSidebarState(userDesktopExpanded);
         }
     }
@@ -423,51 +707,15 @@ public class MainLayoutView extends StackPane implements Disposable {
     }
 
     private void applyDesktopSidebarState(boolean expanded) {
-        if (expanded) {
-            sidebarBox.setPrefWidth(250);
-            sidebarBox.setMinWidth(250);
-            sidebarBox.setMaxWidth(250);
-            sidebarBox.getStyleClass().remove("sidebar-collapsed");
-
-            if (brandTitle != null) { brandTitle.setVisible(true); brandTitle.setManaged(true); }
-            if (tagBadge != null) { tagBadge.setVisible(true); tagBadge.setManaged(true); }
-            navLabels.values().forEach(lbl -> { lbl.setVisible(true); lbl.setManaged(true); });
-            if (userDetailsBox != null) { userDetailsBox.setVisible(true); userDetailsBox.setManaged(true); }
-            if (logoutTextLabel != null) { logoutTextLabel.setVisible(true); logoutTextLabel.setManaged(true); }
-            if (teamBadgeLabel != null) {
-                boolean show = teamBadgeLabel.getText() != null && !teamBadgeLabel.getText().isEmpty();
-                teamBadgeLabel.setVisible(show);
-                teamBadgeLabel.setManaged(show);
-            }
-
-            navButtons.forEach((type, btn) -> btn.setTooltip(null));
-            if (sidebarLogoutBtn != null) sidebarLogoutBtn.setTooltip(null);
-        } else {
-            sidebarBox.setPrefWidth(72);
-            sidebarBox.setMinWidth(72);
-            sidebarBox.setMaxWidth(72);
-            if (!sidebarBox.getStyleClass().contains("sidebar-collapsed")) {
-                sidebarBox.getStyleClass().add("sidebar-collapsed");
-            }
-
-            if (brandTitle != null) { brandTitle.setVisible(false); brandTitle.setManaged(false); }
-            if (tagBadge != null) { tagBadge.setVisible(false); tagBadge.setManaged(false); }
-            navLabels.values().forEach(lbl -> { lbl.setVisible(false); lbl.setManaged(false); });
-            if (userDetailsBox != null) { userDetailsBox.setVisible(false); userDetailsBox.setManaged(false); }
-            if (logoutTextLabel != null) { logoutTextLabel.setVisible(false); logoutTextLabel.setManaged(false); }
-            if (teamBadgeLabel != null) {
-                teamBadgeLabel.setVisible(false);
-                teamBadgeLabel.setManaged(false);
-            }
-
-            navButtons.forEach((type, btn) -> {
-                Label label = navLabels.get(type);
-                if (label != null) {
-                    btn.setTooltip(new Tooltip(label.getText()));
-                }
-            });
-            if (sidebarLogoutBtn != null) sidebarLogoutBtn.setTooltip(new Tooltip("Sign Out"));
+        if (sidebarAnimation != null) {
+            sidebarAnimation.stop();
         }
+        double targetWidth = expanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+        sidebarBox.setPrefWidth(targetWidth);
+        sidebarBox.setMinWidth(targetWidth);
+        sidebarBox.setMaxWidth(targetWidth);
+        setSidebarCollapsedState(!expanded);
+        setLabelsVisible(expanded);
     }
 
     public void refreshTeamBadge() {
@@ -482,10 +730,47 @@ public class MainLayoutView extends StackPane implements Disposable {
                     boolean show = !sidebarBox.getStyleClass().contains("sidebar-collapsed");
                     teamBadgeLabel.setVisible(show);
                     teamBadgeLabel.setManaged(show);
+                    if (teamBadgeSpacer != null) {
+                        teamBadgeSpacer.setVisible(show);
+                        teamBadgeSpacer.setManaged(show);
+                    }
                 } else {
                     teamBadgeLabel.setText("");
                     teamBadgeLabel.setVisible(false);
                     teamBadgeLabel.setManaged(false);
+                    if (teamBadgeSpacer != null) {
+                        teamBadgeSpacer.setVisible(false);
+                        teamBadgeSpacer.setManaged(false);
+                    }
+                }
+            });
+        });
+    }
+
+    public void refreshReviewBadge() {
+        User currentUser = AuthService.getCurrentUser();
+        if (currentUser == null || !currentUser.getRole().isManagerOrAbove() || reviewBadgeLabel == null) return;
+        int orgId = currentUser.getOrganizationId() > 0 ? currentUser.getOrganizationId() : 1;
+        com.bai.inventory.util.AppExecutor.execute(() -> {
+            int pending = submissionDao.countPending(orgId);
+            Platform.runLater(() -> {
+                if (pending > 0) {
+                    reviewBadgeLabel.setText(pending + " pending");
+                    boolean show = !sidebarBox.getStyleClass().contains("sidebar-collapsed");
+                    reviewBadgeLabel.setVisible(show);
+                    reviewBadgeLabel.setManaged(show);
+                    if (reviewBadgeSpacer != null) {
+                        reviewBadgeSpacer.setVisible(show);
+                        reviewBadgeSpacer.setManaged(show);
+                    }
+                } else {
+                    reviewBadgeLabel.setText("");
+                    reviewBadgeLabel.setVisible(false);
+                    reviewBadgeLabel.setManaged(false);
+                    if (reviewBadgeSpacer != null) {
+                        reviewBadgeSpacer.setVisible(false);
+                        reviewBadgeSpacer.setManaged(false);
+                    }
                 }
             });
         });
@@ -496,6 +781,18 @@ public class MainLayoutView extends StackPane implements Disposable {
         if (type == ViewType.USERS) {
             if (currentUser == null || currentUser.getRole() != Role.OWNER) {
                 ViewNavigator.showToast("Access Denied: Business Owner role required.", true);
+                return;
+            }
+        }
+        if (type == ViewType.PRODUCT_REVIEW) {
+            if (currentUser == null || !currentUser.getRole().isManagerOrAbove()) {
+                ViewNavigator.showToast("Access Denied: Product Review requires Manager or Owner role.", true);
+                return;
+            }
+        }
+        if (type == ViewType.REPORT) {
+            if (currentUser != null && currentUser.getRole() == Role.EMPLOYEE) {
+                ViewNavigator.showToast("Access Denied: Reports are restricted to Owners and Managers.", true);
                 return;
             }
         }
@@ -532,6 +829,7 @@ public class MainLayoutView extends StackPane implements Disposable {
         return switch (type) {
             case DASHBOARD -> "Dashboard";
             case PRODUCT -> "Products";
+            case PRODUCT_REVIEW -> "Product Review & Performance";
             case INVENTORY -> "Inventory Control";
             case ANALYTICS -> "Stock Analytics";
             case AI_INSIGHTS -> "bAI Insights";
@@ -545,6 +843,7 @@ public class MainLayoutView extends StackPane implements Disposable {
         return switch (type) {
             case DASHBOARD -> new DashboardView();
             case PRODUCT -> new ProductCatalogView();
+            case PRODUCT_REVIEW -> new com.bai.inventory.view.pages.ProductReviewView();
             case INVENTORY -> new InventoryView();
             case ANALYTICS -> new AnalyticsView();
             case AI_INSIGHTS -> new com.bai.inventory.view.pages.AIInsightsView();
@@ -601,6 +900,9 @@ public class MainLayoutView extends StackPane implements Disposable {
 
     @Override
     public void dispose() {
+        if (sidebarAnimation != null) {
+            sidebarAnimation.stop();
+        }
         if (currentSubView instanceof Disposable disposable) {
             try {
                 disposable.dispose();

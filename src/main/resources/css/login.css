@@ -229,6 +229,20 @@
     -fx-alignment: CENTER_LEFT;
 }
 
+.input-error,
+.text-field.input-error,
+.password-field.input-error,
+.input-box.input-error {
+    -fx-border-color: #EF4444 !important;
+    -fx-border-width: 1.5px !important;
+}
+
+.field-error-text {
+    -fx-font-size: 12px;
+    -fx-text-fill: #EF4444;
+    -fx-font-weight: 500;
+}
+
 .btn-auth-submit {
     -fx-background-color: -primary;
     -fx-background-radius: 10;

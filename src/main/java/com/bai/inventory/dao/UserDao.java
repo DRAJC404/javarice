@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -201,7 +202,26 @@ public class UserDao {
                     codeStmt.setString(1, codeHash);
                     try (ResultSet rs = codeStmt.executeQuery()) {
                         if (!rs.next() || !rs.getBoolean("org_active")) {
-                            throw new com.bai.inventory.service.AuthService.ValidationException("Invalid or expired code.");
+                            String statusSql = "SELECT expires_at, used_at, cancelled_at, org_active FROM fn_check_join_code_status(?)";
+                            try (PreparedStatement statusStmt = conn.prepareStatement(statusSql)) {
+                                statusStmt.setString(1, codeHash);
+                                try (ResultSet srs = statusStmt.executeQuery()) {
+                                    if (!srs.next()) {
+                                        throw new com.bai.inventory.service.AuthService.ValidationException("We couldn't find that code. Please check it and try again.");
+                                    }
+                                    if (srs.getTimestamp("used_at") != null) {
+                                        throw new com.bai.inventory.service.AuthService.ValidationException("This code has already been used.");
+                                    }
+                                    Timestamp exp = srs.getTimestamp("expires_at");
+                                    if (srs.getTimestamp("cancelled_at") != null || (exp != null && exp.toInstant().isBefore(Instant.now()))) {
+                                        throw new com.bai.inventory.service.AuthService.ValidationException("This code has expired. Ask your admin to generate a new one.");
+                                    }
+                                    if (!srs.getBoolean("org_active")) {
+                                        throw new com.bai.inventory.service.AuthService.ValidationException("The organization associated with this code is inactive.");
+                                    }
+                                }
+                            }
+                            throw new com.bai.inventory.service.AuthService.ValidationException("We couldn't find that code. Please check it and try again.");
                         }
                         codeId = rs.getInt("id");
                         orgId = rs.getInt("organization_id");
@@ -215,7 +235,7 @@ public class UserDao {
                     emailStmt.setString(1, email.trim().toLowerCase());
                     try (ResultSet rs = emailStmt.executeQuery()) {
                         if (rs.next() && rs.getBoolean(1)) {
-                            throw new com.bai.inventory.service.AuthService.ValidationException("An account with this email address already exists.");
+                            throw new com.bai.inventory.service.AuthService.ValidationException("An account with this email already exists. Try signing in instead.");
                         }
                     }
                 }

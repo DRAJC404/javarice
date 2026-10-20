@@ -26,6 +26,9 @@ public class AuditLogDao {
     public void logAction(int organizationId, Integer userId, String action, String details) {
         try (Connection conn = DatabaseConfig.getConnection()) {
             logAction(conn, organizationId, userId, action, details);
+            if (!conn.getAutoCommit()) {
+                conn.commit();
+            }
         } catch (SQLException e) {
             System.err.println("[AuditLogDao] Error writing audit log: " + e.getMessage());
         }

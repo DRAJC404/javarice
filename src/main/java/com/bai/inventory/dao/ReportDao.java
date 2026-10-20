@@ -79,7 +79,7 @@ public class ReportDao {
                      "p.image_path, p.status, p.is_archived, p.created_at, p.updated_at " +
                      "FROM products p " +
                      "LEFT JOIN categories c ON p.category_id = c.id " +
-                     "WHERE p.organization_id = ? AND p.is_archived = false " +
+                     "WHERE p.organization_id = ? AND p.is_archived = false AND p.is_deleted = false AND p.approval_status = 'APPROVED' " +
                      "ORDER BY p.name ASC";
         return queryProducts(orgId, sql);
     }
@@ -90,7 +90,7 @@ public class ReportDao {
                      "p.image_path, p.status, p.is_archived, p.created_at, p.updated_at " +
                      "FROM products p " +
                      "LEFT JOIN categories c ON p.category_id = c.id " +
-                     "WHERE p.organization_id = ? " +
+                     "WHERE p.organization_id = ? AND p.is_deleted = false AND p.approval_status = 'APPROVED' " +
                      "ORDER BY p.name ASC";
         return queryProducts(orgId, sql);
     }
@@ -101,9 +101,64 @@ public class ReportDao {
                      "p.image_path, p.status, p.is_archived, p.created_at, p.updated_at " +
                      "FROM products p " +
                      "LEFT JOIN categories c ON p.category_id = c.id " +
-                     "WHERE p.organization_id = ? AND p.is_archived = false AND p.stock_quantity <= p.low_stock_threshold " +
+                     "WHERE p.organization_id = ? AND p.is_archived = false AND p.is_deleted = false AND p.approval_status = 'APPROVED' AND p.stock_quantity <= p.low_stock_threshold " +
                      "ORDER BY p.stock_quantity ASC, p.name ASC";
         return queryProducts(orgId, sql);
+    }
+
+    public List<com.bai.inventory.model.ProductPerformance> getProductPerformanceReport(int orgId, LocalDateTime from, LocalDateTime to) {
+        List<com.bai.inventory.model.ProductPerformance> list = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(
+                "SELECT p.id AS product_id, p.name AS product_name, p.sku, c.name AS category_name, " +
+                "p.stock_quantity AS stock_left, p.selling_price, p.cost_price, " +
+                "COALESCE(SUM(CASE WHEN sm.reason = 'SOLD' THEN sm.quantity ELSE 0 END), 0) AS units_sold, " +
+                "COALESCE(SUM(CASE WHEN sm.reason IN ('DAMAGED', 'EXPIRED') THEN sm.quantity ELSE 0 END), 0) AS damaged_expired " +
+                "FROM products p " +
+                "LEFT JOIN categories c ON p.category_id = c.id " +
+                "LEFT JOIN stock_movements sm ON p.id = sm.product_id AND sm.movement_type = 'OUT' "
+        );
+
+        if (from != null) {
+            sql.append(" AND sm.created_at >= ?");
+        }
+        if (to != null) {
+            sql.append(" AND sm.created_at <= ?");
+        }
+        sql.append(" WHERE p.organization_id = ? AND p.is_deleted = false AND p.approval_status = 'APPROVED' ")
+           .append(" GROUP BY p.id, p.name, p.sku, c.name, p.stock_quantity, p.selling_price, p.cost_price ")
+           .append(" ORDER BY units_sold DESC, p.name ASC");
+
+        try (Connection conn = DatabaseConfig.getConnection(orgId);
+             PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
+            int idx = 1;
+            if (from != null) {
+                stmt.setTimestamp(idx++, Timestamp.valueOf(from));
+            }
+            if (to != null) {
+                stmt.setTimestamp(idx++, Timestamp.valueOf(to));
+            }
+            stmt.setInt(idx++, orgId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    com.bai.inventory.model.ProductPerformance perf = new com.bai.inventory.model.ProductPerformance(
+                            rs.getInt("product_id"),
+                            rs.getString("product_name"),
+                            rs.getString("sku"),
+                            rs.getString("category_name"),
+                            rs.getInt("units_sold"),
+                            rs.getInt("stock_left"),
+                            rs.getBigDecimal("selling_price"),
+                            rs.getBigDecimal("cost_price"),
+                            rs.getInt("damaged_expired")
+                    );
+                    list.add(perf);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[ReportDao] Error querying product performance report: " + e.getMessage());
+        }
+        return list;
     }
 
     private List<Product> queryProducts(int orgId, String sql) {

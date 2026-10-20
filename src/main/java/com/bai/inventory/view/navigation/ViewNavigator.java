@@ -64,6 +64,10 @@ public class ViewNavigator {
         return primaryStage;
     }
 
+    public static Parent getCurrentPage() {
+        return currentPage;
+    }
+
     public static void routeByRole(User user) {
         if (user == null) {
             showLogin();
@@ -198,14 +202,14 @@ public class ViewNavigator {
     }
 
     public static void logout() {
-        hideOverlayDialog();
+        hideAllOverlayDialogs();
         resetIdleCountdown();
         new AuthService().logout();
         showLogin();
     }
 
     public static void setRoot(Parent root, String title) {
-        hideOverlayDialog();
+        hideAllOverlayDialogs();
         if (currentPage instanceof Disposable disposable) {
             try {
                 disposable.dispose();
@@ -280,13 +284,35 @@ public class ViewNavigator {
         showOverlayDialog(title, message, type, "Understood", onConfirm);
     }
 
+    private static void pushDialogNode(Node node) {
+        if (contentPane != null) {
+            contentPane.setDisable(true);
+        }
+        isDialogOpen = true;
+
+        if (dialogOverlay.getChildren().isEmpty()) {
+            dialogOverlay.getChildren().add(node);
+        } else {
+            Node currentTop = dialogOverlay.getChildren().get(dialogOverlay.getChildren().size() - 1);
+            currentTop.setDisable(true);
+
+            StackPane modalLayer = new StackPane(node);
+            modalLayer.setStyle("-fx-background-color: rgba(15, 23, 42, 0.45); -fx-alignment: center;");
+            modalLayer.setOnMouseClicked(e -> {
+                if (e.getTarget() == modalLayer && !operationInProgress.get()) {
+                    hideOverlayDialog(node);
+                }
+            });
+            dialogOverlay.getChildren().add(modalLayer);
+        }
+
+        dialogOverlay.setVisible(true);
+        dialogOverlay.setManaged(true);
+    }
+
     public static void showOverlayDialog(String title, String message, OverlayType type, String buttonText, Runnable onConfirm) {
         Platform.runLater(() -> {
             if (dialogOverlay == null) return;
-
-            contentPane.setDisable(true);
-            isDialogOpen = true;
-            dialogOverlay.getChildren().clear();
 
             VBox card = new VBox(16);
             card.getStyleClass().add("dialog-modal-card");
@@ -331,7 +357,7 @@ public class ViewNavigator {
             closeIcon.setContent(SVG_CLOSE);
             closeIcon.getStyleClass().add("dialog-close-icon");
             closeBtn.setGraphic(closeIcon);
-            closeBtn.setOnAction(e -> hideOverlayDialog());
+            closeBtn.setOnAction(e -> hideOverlayDialog(card));
             header.setRight(closeBtn);
 
             Label messageLabel = new Label(message);
@@ -344,7 +370,7 @@ public class ViewNavigator {
             Button okBtn = new Button(buttonText != null ? buttonText : "Understood");
             okBtn.getStyleClass().add("btn-dialog-confirm");
             okBtn.setOnAction(e -> {
-                hideOverlayDialog();
+                hideOverlayDialog(card);
                 if (onConfirm != null) onConfirm.run();
             });
 
@@ -352,9 +378,7 @@ public class ViewNavigator {
             card.getChildren().addAll(header, messageLabel, buttonRow);
 
             StackPane.setAlignment(card, Pos.CENTER);
-            dialogOverlay.getChildren().add(card);
-            dialogOverlay.setVisible(true);
-            dialogOverlay.setManaged(true);
+            pushDialogNode(card);
             Platform.runLater(okBtn::requestFocus);
         });
     }
@@ -362,10 +386,6 @@ public class ViewNavigator {
     public static void showConfirmDialog(String title, String message, String confirmText, Runnable onConfirm) {
         Platform.runLater(() -> {
             if (dialogOverlay == null) return;
-
-            contentPane.setDisable(true);
-            isDialogOpen = true;
-            dialogOverlay.getChildren().clear();
 
             VBox card = new VBox(16);
             card.getStyleClass().add("dialog-modal-card");
@@ -394,7 +414,7 @@ public class ViewNavigator {
             closeIcon.setContent(SVG_CLOSE);
             closeIcon.getStyleClass().add("dialog-close-icon");
             closeBtn.setGraphic(closeIcon);
-            closeBtn.setOnAction(e -> hideOverlayDialog());
+            closeBtn.setOnAction(e -> hideOverlayDialog(card));
             header.setRight(closeBtn);
 
             Label messageLabel = new Label(message);
@@ -406,12 +426,12 @@ public class ViewNavigator {
 
             Button cancelBtn = new Button("Cancel");
             cancelBtn.getStyleClass().add("btn-dialog-cancel");
-            cancelBtn.setOnAction(e -> hideOverlayDialog());
+            cancelBtn.setOnAction(e -> hideOverlayDialog(card));
 
             Button confirmBtn = new Button(confirmText != null ? confirmText : "Confirm");
             confirmBtn.getStyleClass().add("btn-dialog-confirm");
             confirmBtn.setOnAction(e -> {
-                hideOverlayDialog();
+                hideOverlayDialog(card);
                 if (onConfirm != null) onConfirm.run();
             });
 
@@ -419,9 +439,7 @@ public class ViewNavigator {
             card.getChildren().addAll(header, messageLabel, buttonRow);
 
             StackPane.setAlignment(card, Pos.CENTER);
-            dialogOverlay.getChildren().add(card);
-            dialogOverlay.setVisible(true);
-            dialogOverlay.setManaged(true);
+            pushDialogNode(card);
             Platform.runLater(confirmBtn::requestFocus);
         });
     }
@@ -429,29 +447,90 @@ public class ViewNavigator {
     public static void showCustomDialog(Node content) {
         Platform.runLater(() -> {
             if (dialogOverlay == null) return;
-            contentPane.setDisable(true);
-            isDialogOpen = true;
-            dialogOverlay.getChildren().clear();
+
+            for (Node existing : dialogOverlay.getChildren()) {
+                if (existing == content || (existing instanceof Pane p && p.getChildren().contains(content))) {
+                    return;
+                }
+            }
+
             if (content instanceof Region reg) {
                 reg.setMaxHeight(Region.USE_PREF_SIZE);
             }
             StackPane.setAlignment(content, Pos.CENTER);
-            dialogOverlay.getChildren().add(content);
-            dialogOverlay.setVisible(true);
-            dialogOverlay.setManaged(true);
+            pushDialogNode(content);
         });
     }
 
     public static void hideOverlayDialog() {
-        if (dialogOverlay != null) {
-            dialogOverlay.setVisible(false);
-            dialogOverlay.setManaged(false);
-            dialogOverlay.getChildren().clear();
-        }
-        if (contentPane != null) {
-            contentPane.setDisable(false);
-        }
-        isDialogOpen = false;
+        hideOverlayDialog(null);
+    }
+
+    public static void hideOverlayDialog(Node specificDialog) {
+        Platform.runLater(() -> {
+            if (dialogOverlay == null || dialogOverlay.getChildren().isEmpty()) {
+                if (dialogOverlay != null) {
+                    dialogOverlay.setVisible(false);
+                    dialogOverlay.setManaged(false);
+                }
+                if (contentPane != null) {
+                    contentPane.setDisable(false);
+                }
+                isDialogOpen = false;
+                return;
+            }
+
+            if (specificDialog == null) {
+                int lastIdx = dialogOverlay.getChildren().size() - 1;
+                dialogOverlay.getChildren().remove(lastIdx);
+            } else {
+                Node toRemove = null;
+                for (Node child : dialogOverlay.getChildren()) {
+                    if (child == specificDialog) {
+                        toRemove = child;
+                        break;
+                    }
+                    if (child instanceof Pane pane && pane.getChildren().contains(specificDialog)) {
+                        toRemove = child;
+                        break;
+                    }
+                }
+                if (toRemove != null) {
+                    dialogOverlay.getChildren().remove(toRemove);
+                } else {
+                    int lastIdx = dialogOverlay.getChildren().size() - 1;
+                    dialogOverlay.getChildren().remove(lastIdx);
+                }
+            }
+
+            if (dialogOverlay.getChildren().isEmpty()) {
+                dialogOverlay.setVisible(false);
+                dialogOverlay.setManaged(false);
+                if (contentPane != null) {
+                    contentPane.setDisable(false);
+                }
+                isDialogOpen = false;
+            } else {
+                Node top = dialogOverlay.getChildren().get(dialogOverlay.getChildren().size() - 1);
+                top.setDisable(false);
+                isDialogOpen = true;
+                Platform.runLater(top::requestFocus);
+            }
+        });
+    }
+
+    public static void hideAllOverlayDialogs() {
+        Platform.runLater(() -> {
+            if (dialogOverlay != null) {
+                dialogOverlay.getChildren().clear();
+                dialogOverlay.setVisible(false);
+                dialogOverlay.setManaged(false);
+            }
+            if (contentPane != null) {
+                contentPane.setDisable(false);
+            }
+            isDialogOpen = false;
+        });
     }
 
     private static final java.util.concurrent.atomic.AtomicBoolean operationInProgress = new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -506,37 +585,6 @@ public class ViewNavigator {
             timer.play();
         });
     }
-
-    public static void showUndoToast(String message, Runnable onUndo) {
-        Platform.runLater(() -> {
-            if (toastContainer == null) return;
-
-            HBox toast = new HBox(14);
-            toast.getStyleClass().add("global-toast-success");
-            toast.setAlignment(Pos.CENTER_LEFT);
-            toast.setMaxWidth(520);
-
-            Label msgLabel = new Label(message);
-            msgLabel.getStyleClass().add("toast-msg-text");
-            HBox.setHgrow(msgLabel, Priority.ALWAYS);
-
-            Button undoBtn = new Button("Undo");
-            undoBtn.getStyleClass().add("btn-toast-undo-action");
-            undoBtn.setOnAction(e -> {
-                toastContainer.getChildren().remove(toast);
-                if (onUndo != null) onUndo.run();
-            });
-
-            toast.getChildren().addAll(msgLabel, undoBtn);
-            toastContainer.getChildren().add(toast);
-
-            Timeline timer = new Timeline(new KeyFrame(Duration.seconds(9.0), e -> {
-                toastContainer.getChildren().remove(toast);
-            }));
-            timer.play();
-        });
-    }
-
 
     private static void onUserActivity() {
         lastActivityTimestamp = System.currentTimeMillis();

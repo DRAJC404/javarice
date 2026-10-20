@@ -28,6 +28,11 @@ public class InventoryService {
         this.movementDao = movementDao;
     }
 
+    public StockMovement deductPosSale(int productId, int quantity, User user)
+            throws InventoryException, AccessDeniedException, SQLException {
+        return deductStock(productId, quantity, "SOLD", user);
+    }
+
     public StockMovement deductStock(int productId, int quantity, String reason, User user)
             throws InventoryException, AccessDeniedException, SQLException {
 
@@ -127,144 +132,6 @@ public class InventoryService {
                 if (ex instanceof AccessDeniedException ade) throw ade;
                 if (ex instanceof SQLException se) throw se;
                 throw new InventoryException("Error performing deduction: " + ex.getMessage());
-            } finally {
-                conn.setAutoCommit(true);
-            }
-        }
-    }
-
-    public StockMovement undoDeduction(int movementId, User user)
-            throws InventoryException, AccessDeniedException, SQLException {
-
-        if (user == null) {
-            throw new AccessDeniedException("User session required.");
-        }
-
-        if (DatabaseConfig.isDevModeEnabled()) {
-            StockMovement mockUndo = new StockMovement();
-            mockUndo.setId((int) (System.currentTimeMillis() % 100000));
-            mockUndo.setOrganizationId(user.getOrganizationId());
-            mockUndo.setReferenceNo("SM-UNDO-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-            mockUndo.setMovementType("IN");
-            mockUndo.setReason("UNDO");
-            mockUndo.setQuantity(1);
-            mockUndo.setCreatedAt(LocalDateTime.now());
-            return mockUndo;
-        }
-
-        int orgId = user.getOrganizationId() > 0 ? user.getOrganizationId() : 1;
-
-        try (Connection conn = DatabaseConfig.getConnection(orgId)) {
-            conn.setAutoCommit(false);
-            try {
-                checkUserActiveInDb(conn, user.getId(), orgId);
-
-                String origSql = "SELECT id, organization_id, reference_no, product_id, user_id, movement_type, quantity, reason, " +
-                                 "undone_by_movement_id, created_at, (created_at > NOW() - INTERVAL '10 minutes') AS is_within_10_min " +
-                                 "FROM stock_movements WHERE id = ? AND organization_id = ? FOR UPDATE";
-
-                int origProductId;
-                int origUserId;
-                String origType;
-                int restoreQty;
-                Integer alreadyUndoneId = null;
-                boolean isWithin10Min;
-                String origRef;
-
-                try (PreparedStatement origStmt = conn.prepareStatement(origSql)) {
-                    origStmt.setInt(1, movementId);
-                    origStmt.setInt(2, orgId);
-                    try (ResultSet rs = origStmt.executeQuery()) {
-                        if (!rs.next()) {
-                            throw new InventoryException("Original stock movement not found.");
-                        }
-                        origProductId = rs.getInt("product_id");
-                        origUserId = rs.getInt("user_id");
-                        origType = rs.getString("movement_type");
-                        restoreQty = rs.getInt("quantity");
-                        int undoneId = rs.getInt("undone_by_movement_id");
-                        if (!rs.wasNull()) {
-                            alreadyUndoneId = undoneId;
-                        }
-                        isWithin10Min = rs.getBoolean("is_within_10_min");
-                        origRef = rs.getString("reference_no");
-                    }
-                }
-
-                if (!"OUT".equalsIgnoreCase(origType)) {
-                    throw new InventoryException("Only OUT movements can be undone.");
-                }
-
-                if (alreadyUndoneId != null) {
-                    throw new InventoryException("This deduction was already undone (Movement #" + alreadyUndoneId + ").");
-                }
-
-                if (!isWithin10Min) {
-                    throw new InventoryException("Undo expired. Deductions can only be undone within 10 minutes.");
-                }
-
-                if (user.getRole() == Role.EMPLOYEE && origUserId != user.getId()) {
-                    throw new AccessDeniedException("Employees may only undo their own recent deductions.");
-                }
-
-                String lockProdSql = "SELECT stock_quantity, name FROM products WHERE id = ? AND organization_id = ? FOR UPDATE";
-                int currentStock;
-                String productName;
-                try (PreparedStatement lockStmt = conn.prepareStatement(lockProdSql)) {
-                    lockStmt.setInt(1, origProductId);
-                    lockStmt.setInt(2, orgId);
-                    try (ResultSet rs = lockStmt.executeQuery()) {
-                        if (!rs.next()) throw new InventoryException("Product no longer exists.");
-                        currentStock = rs.getInt("stock_quantity");
-                        productName = rs.getString("name");
-                    }
-                }
-
-                int newStock = currentStock + restoreQty;
-
-                String updateProdSql = "UPDATE products SET stock_quantity = ? WHERE id = ? AND organization_id = ?";
-                try (PreparedStatement updateStmt = conn.prepareStatement(updateProdSql)) {
-                    updateStmt.setInt(1, newStock);
-                    updateStmt.setInt(2, origProductId);
-                    updateStmt.setInt(3, orgId);
-                    updateStmt.executeUpdate();
-                }
-
-                StockMovement undoMovement = new StockMovement(
-                        0,
-                        orgId,
-                        generateRefNo("UNDO"),
-                        origProductId,
-                        user.getId(),
-                        "IN",
-                        restoreQty,
-                        "UNDO",
-                        currentStock,
-                        newStock,
-                        "Undo of deduction ref: " + origRef,
-                        null
-                );
-                undoMovement.setProductName(productName);
-
-                StockMovement savedUndo = insertMovementWithRetry(conn, undoMovement);
-
-                String linkSql = "UPDATE stock_movements SET undone_by_movement_id = ? WHERE id = ? AND organization_id = ?";
-                try (PreparedStatement linkStmt = conn.prepareStatement(linkSql)) {
-                    linkStmt.setInt(1, savedUndo.getId());
-                    linkStmt.setInt(2, movementId);
-                    linkStmt.setInt(3, orgId);
-                    linkStmt.executeUpdate();
-                }
-
-                conn.commit();
-                return savedUndo;
-
-            } catch (Exception ex) {
-                conn.rollback();
-                if (ex instanceof InventoryException ie) throw ie;
-                if (ex instanceof AccessDeniedException ade) throw ade;
-                if (ex instanceof SQLException se) throw se;
-                throw new InventoryException("Error undoing deduction: " + ex.getMessage());
             } finally {
                 conn.setAutoCommit(true);
             }

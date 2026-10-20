@@ -42,12 +42,61 @@
     -fx-border-color: transparent -border-subtle transparent transparent;
     -fx-border-width: 0 1 0 0;
     -fx-pref-width: 250px;
-    -fx-min-width: 250px;
+    -fx-min-width: 72px;
     -fx-padding: 24 16 20 16;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.04), 8, 0, 2, 0);
 }
 .sidebar-brand-box {
-    -fx-padding: 0 8 28 8;
+    -fx-padding: 0 0 24 0;
     -fx-alignment: CENTER_LEFT;
+}
+.sidebar-hamburger-btn {
+    -fx-background-color: transparent;
+    -fx-border-color: -border-subtle;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 0;
+    -fx-pref-width: 44px;
+    -fx-min-width: 44px;
+    -fx-max-width: 44px;
+    -fx-pref-height: 44px;
+    -fx-min-height: 44px;
+    -fx-max-height: 44px;
+    -fx-alignment: CENTER;
+    -fx-cursor: hand;
+}
+.sidebar-hamburger-btn:hover {
+    -fx-background-color: -bg-card-hover;
+    -fx-border-color: -border-medium;
+}
+.sidebar-hamburger-btn:focused {
+    -fx-border-color: -primary;
+    -fx-effect: dropshadow(gaussian, rgba(59, 130, 246, 0.4), 6, 0, 0, 0);
+}
+.sidebar-nav-button {
+    -fx-pref-height: 44px;
+    -fx-min-height: 44px;
+    -fx-max-height: 44px;
+    -fx-alignment: CENTER_LEFT;
+}
+.sidebar-collapsed .sidebar-nav-button {
+    -fx-pref-width: 44px;
+    -fx-min-width: 44px;
+    -fx-max-width: 44px;
+    -fx-pref-height: 44px;
+    -fx-min-height: 44px;
+    -fx-max-height: 44px;
+    -fx-alignment: CENTER;
+    -fx-padding: 0;
+}
+.sidebar-nav-icon, .sidebar-icon-box {
+    -fx-pref-width: 22px;
+    -fx-min-width: 22px;
+    -fx-max-width: 22px;
+    -fx-pref-height: 22px;
+    -fx-min-height: 22px;
+    -fx-max-height: 22px;
+    -fx-alignment: CENTER;
 }
 .sidebar-logo {
     -fx-font-size: 24px;
@@ -71,14 +120,14 @@
     -fx-border-radius: 10;
     -fx-focus-color: transparent;
     -fx-faint-focus-color: transparent;
-    -fx-padding: 12 16 12 16;
+    -fx-padding: 0 16;
     -fx-alignment: CENTER_LEFT;
     -fx-cursor: hand;
     -fx-font-size: 14px;
     -fx-font-weight: 600;
     -fx-text-fill: -text-muted;
-    -fx-pref-height: 46px;
-    -fx-min-height: 46px;
+    -fx-pref-height: 44px;
+    -fx-min-height: 44px;
 }
 .sidebar-item:hover {
     -fx-background-color: -primary-light;
@@ -91,6 +140,8 @@
 }
 .sidebar-item-icon {
     -fx-fill: -text-muted;
+    -fx-scale-x: 0.9;
+    -fx-scale-y: 0.9;
 }
 .sidebar-item:hover .sidebar-item-icon {
     -fx-fill: -primary;
@@ -119,8 +170,10 @@
 .sidebar-user-avatar {
     -fx-background-color: -primary-light;
     -fx-background-radius: 20;
-    -fx-pref-width: 38px;
-    -fx-pref-height: 38px;
+    -fx-pref-width: 40px;
+    -fx-pref-height: 40px;
+    -fx-min-width: 40px;
+    -fx-min-height: 40px;
     -fx-alignment: CENTER;
     -fx-text-fill: -primary;
     -fx-font-weight: 700;
@@ -223,42 +276,56 @@
     -fx-text-fill: -text-muted;
 }
 .stat-icon-tile {
-    -fx-min-width: 36px;
-    -fx-max-width: 36px;
-    -fx-min-height: 36px;
-    -fx-max-height: 36px;
-    -fx-background-radius: 10;
+    -fx-min-width: 32px;
+    -fx-max-width: 32px;
+    -fx-min-height: 32px;
+    -fx-max-height: 32px;
+    -fx-background-color: #F3F4F6;
+    -fx-background-radius: 6;
     -fx-alignment: CENTER;
 }
+.stat-tile-icon {
+    -fx-scale-x: 0.75;
+    -fx-scale-y: 0.75;
+}
+.stat-icon {
+    -fx-fill: #6B7280;
+}
+.stat-icon-warning {
+    -fx-fill: #D97706;
+}
+.stat-icon-danger {
+    -fx-fill: #DC2626;
+}
 .stat-tile-blue {
-    -fx-background-color: #EFF6FF;
+    -fx-background-color: #F3F4F6;
 }
 .stat-tile-blue > .stat-tile-icon {
-    -fx-fill: #3B82F6;
+    -fx-fill: #6B7280;
 }
 .stat-tile-amber {
-    -fx-background-color: #FFFBEB;
+    -fx-background-color: #F3F4F6;
 }
 .stat-tile-amber > .stat-tile-icon {
-    -fx-fill: #F59E0B;
+    -fx-fill: #D97706;
 }
 .stat-tile-red {
-    -fx-background-color: #FEF2F2;
+    -fx-background-color: #F3F4F6;
 }
 .stat-tile-red > .stat-tile-icon {
-    -fx-fill: #EF4444;
+    -fx-fill: #DC2626;
 }
 .stat-tile-indigo {
-    -fx-background-color: #EEF2FF;
+    -fx-background-color: #F3F4F6;
 }
 .stat-tile-indigo > .stat-tile-icon {
-    -fx-fill: #6366F1;
+    -fx-fill: #6B7280;
 }
 .stat-tile-green {
-    -fx-background-color: #ECFDF5;
+    -fx-background-color: #F3F4F6;
 }
 .stat-tile-green > .stat-tile-icon {
-    -fx-fill: #10B981;
+    -fx-fill: #6B7280;
 }
 .stat-icon-box {
     -fx-background-radius: 10;
@@ -886,10 +953,10 @@
     -fx-line-spacing: 3px;
 }
 .sidebar-icon-box {
-    -fx-min-width: 20px;
-    -fx-max-width: 20px;
-    -fx-min-height: 20px;
-    -fx-max-height: 20px;
+    -fx-min-width: 22px;
+    -fx-max-width: 22px;
+    -fx-min-height: 22px;
+    -fx-max-height: 22px;
     -fx-alignment: CENTER;
 }
 .dashboard-item-row {
@@ -1029,15 +1096,55 @@
     -fx-pref-width: 72px;
     -fx-min-width: 72px;
     -fx-max-width: 72px;
-    -fx-padding: 20 8 16 8;
+    -fx-padding: 20 0 16 0;
+    -fx-alignment: TOP_CENTER;
+}
+.sidebar-collapsed .sidebar-brand-box {
+    -fx-alignment: CENTER;
+    -fx-padding: 0 0 20 0;
+}
+.sidebar-collapsed .sidebar-nav-container {
     -fx-alignment: TOP_CENTER;
 }
 .sidebar-collapsed .sidebar-item {
     -fx-alignment: CENTER;
-    -fx-padding: 12 0;
+    -fx-padding: 0;
+    -fx-pref-width: 44px;
+    -fx-min-width: 44px;
+    -fx-max-width: 44px;
+    -fx-pref-height: 44px;
+    -fx-min-height: 44px;
+    -fx-max-height: 44px;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+}
+.sidebar-collapsed .sidebar-item-active {
+    -fx-background-color: -primary;
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
 }
 .sidebar-collapsed .sidebar-footer {
+    -fx-alignment: TOP_CENTER;
+    -fx-padding: 16 0 0 0;
+}
+.sidebar-collapsed .sidebar-user-avatar {
+    -fx-pref-width: 40px;
+    -fx-pref-height: 40px;
+    -fx-min-width: 40px;
+    -fx-min-height: 40px;
     -fx-alignment: CENTER;
+}
+.sidebar-collapsed .sidebar-logout-btn {
+    -fx-alignment: CENTER;
+    -fx-padding: 0;
+    -fx-pref-width: 44px;
+    -fx-min-width: 44px;
+    -fx-max-width: 44px;
+    -fx-pref-height: 44px;
+    -fx-min-height: 44px;
+    -fx-max-height: 44px;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
 }
 .scroll-pane {
     -fx-background-color: transparent;
