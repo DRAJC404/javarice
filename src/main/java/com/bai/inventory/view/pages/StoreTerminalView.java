@@ -9,11 +9,13 @@ import com.bai.inventory.service.AuthService;
 import com.bai.inventory.service.InventoryService;
 import com.bai.inventory.service.ProductService;
 import com.bai.inventory.util.AppExecutor;
+import com.bai.inventory.util.CalculatorEvaluator;
+import com.bai.inventory.util.Constants;
+import com.bai.inventory.util.ProductImageManager;
 import com.bai.inventory.view.Disposable;
 import com.bai.inventory.view.navigation.ViewNavigator;
-import javafx.animation.KeyFrame;
+import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
-import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
@@ -23,12 +25,17 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
 
+import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -53,24 +60,23 @@ public class StoreTerminalView extends BorderPane implements Disposable {
     private VBox categoryContainer;
     private ScrollPane categoryScrollPane;
 
-    private final StringBuilder qtyBuffer = new StringBuilder("1");
-    private boolean freshEntry = true;
-    private int selectedQuantity = 1;
-    private Label qtyDisplayLabel;
-    private Label maxStockIndicator;
-    private String selectedReason = "SOLD";
+    private final StringBuilder calcBuffer = new StringBuilder();
+    private boolean isResultMode = false;
+    private Label calcExpressionLabel;
+    private Label calcTotalLabel;
+    private Label calcErrorLabel;
+    private javafx.event.EventHandler<KeyEvent> keyEventFilter;
 
     private VBox recentDeductionsBox;
     private ScrollPane recentScrollPane;
     private final List<StockMovement> sessionDeductions = new ArrayList<>();
-    private final Map<Integer, HBox> recentRowMap = new HashMap<>();
 
     private StackPane rootOverlay;
     private HBox toastBox;
     private Label toastMessageLabel;
-    private Button toastUndoButton;
-    private Timeline toastTimer;
-    private StockMovement lastMovementForUndo;
+    private FadeTransition toastFadeIn;
+    private PauseTransition toastStay;
+    private FadeTransition toastFadeOut;
 
     public StoreTerminalView() {
         this.productService = new ProductService();
@@ -104,6 +110,16 @@ public class StoreTerminalView extends BorderPane implements Disposable {
         setupToast();
 
         setCenter(rootOverlay);
+
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (oldScene != null && keyEventFilter != null) {
+                oldScene.removeEventFilter(KeyEvent.KEY_PRESSED, keyEventFilter);
+            }
+            if (newScene != null) {
+                keyEventFilter = this::handleGlobalKeyPress;
+                newScene.addEventFilter(KeyEvent.KEY_PRESSED, keyEventFilter);
+            }
+        });
     }
 
     private Node createLeftPane() {
@@ -205,45 +221,35 @@ public class StoreTerminalView extends BorderPane implements Disposable {
 
         catSection.getChildren().addAll(catHeader, categoryScrollPane);
 
-        VBox reasonSection = new VBox(6);
-        Label reasonTitle = new Label("REASON");
-        reasonTitle.getStyleClass().add("category-header-title");
+        VBox calcSection = new VBox(6);
 
-        HBox reasonBox = new HBox(6);
-        reasonBox.getStyleClass().add("reason-box");
-        String[] reasons = {"Sold", "Used", "Damaged", "Expired"};
-        for (String r : reasons) {
-            Button chip = new Button(r);
-            chip.getStyleClass().add("reason-chip");
-            if (r.equalsIgnoreCase(selectedReason)) chip.getStyleClass().add("selected");
-            chip.setOnAction(e -> {
-                selectedReason = r.toUpperCase();
-                for (Node n : reasonBox.getChildren()) n.getStyleClass().remove("selected");
-                chip.getStyleClass().add("selected");
-            });
-            reasonBox.getChildren().add(chip);
-        }
-        reasonSection.getChildren().addAll(reasonTitle, reasonBox);
+        VBox calcDisplayBox = new VBox(2);
+        calcDisplayBox.getStyleClass().add("keypad-display-box");
+        calcDisplayBox.setAlignment(Pos.CENTER_RIGHT);
 
-        VBox qtySection = new VBox(6);
-        HBox qtyDisplayBox = new HBox(8);
-        qtyDisplayBox.getStyleClass().add("keypad-display-box");
-        qtyDisplayBox.setAlignment(Pos.CENTER_RIGHT);
+        calcExpressionLabel = new Label("");
+        calcExpressionLabel.getStyleClass().add("keypad-expression-label");
 
-        Label qtyLabel = new Label("Quantity:");
-        qtyLabel.getStyleClass().add("keypad-qty-label");
-        HBox.setHgrow(qtyLabel, Priority.ALWAYS);
+        HBox totalRow = new HBox(8);
+        totalRow.setAlignment(Pos.CENTER_RIGHT);
 
-        maxStockIndicator = new Label("");
-        maxStockIndicator.setStyle("-fx-font-size: 11px; -fx-text-fill: #EF4444; -fx-font-weight: 700;");
-        maxStockIndicator.setVisible(false);
+        Label totalTitleLabel = new Label("Total:");
+        totalTitleLabel.getStyleClass().add("keypad-qty-label");
+        HBox.setHgrow(totalTitleLabel, Priority.ALWAYS);
 
-        qtyDisplayLabel = new Label("1");
-        qtyDisplayLabel.getStyleClass().add("keypad-qty-value");
-        qtyDisplayBox.getChildren().addAll(qtyLabel, maxStockIndicator, qtyDisplayLabel);
+        calcTotalLabel = new Label("₱0.00");
+        calcTotalLabel.getStyleClass().add("keypad-qty-value");
+
+        totalRow.getChildren().addAll(totalTitleLabel, calcTotalLabel);
+        calcDisplayBox.getChildren().addAll(calcExpressionLabel, totalRow);
+
+        calcErrorLabel = new Label("");
+        calcErrorLabel.getStyleClass().add("keypad-error-label");
+        calcErrorLabel.setVisible(false);
+        calcErrorLabel.setManaged(false);
 
         GridPane keypad = createKeypad();
-        qtySection.getChildren().addAll(qtyDisplayBox, keypad);
+        calcSection.getChildren().addAll(calcDisplayBox, calcErrorLabel, keypad);
 
         VBox recentSection = new VBox(6);
         VBox.setVgrow(recentSection, Priority.ALWAYS);
@@ -262,7 +268,7 @@ public class StoreTerminalView extends BorderPane implements Disposable {
 
         recentSection.getChildren().addAll(recentTitle, recentScrollPane);
 
-        right.getChildren().addAll(userBox, catSection, reasonSection, qtySection, recentSection);
+        right.getChildren().addAll(userBox, catSection, calcSection, recentSection);
         return right;
     }
 
@@ -273,88 +279,310 @@ public class StoreTerminalView extends BorderPane implements Disposable {
         grid.setHgap(8);
         grid.setVgap(8);
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
             ColumnConstraints cc = new ColumnConstraints();
-            cc.setPercentWidth(33.333);
+            cc.setPercentWidth(25.0);
             cc.setHgrow(Priority.ALWAYS);
             grid.getColumnConstraints().add(cc);
         }
 
-        String[][] keys = {
-                {"7", "8", "9"},
-                {"4", "5", "6"},
-                {"1", "2", "3"},
-                {"C", "0", "⌫"}
+        String[][] layout = {
+                {"7", "8", "9", "÷"},
+                {"4", "5", "6", "×"},
+                {"1", "2", "3", "-"},
+                {"C", "0", ".", "+"}
         };
 
-        for (int r = 0; r < keys.length; r++) {
-            for (int c = 0; c < keys[r].length; c++) {
-                String keyText = keys[r][c];
+        for (int r = 0; r < layout.length; r++) {
+            for (int c = 0; c < layout[r].length; c++) {
+                String keyText = layout[r][c];
                 Button btn = new Button(keyText);
                 btn.getStyleClass().add("btn-keypad");
                 btn.setMaxWidth(Double.MAX_VALUE);
 
-                if (keyText.equals("C") || keyText.equals("⌫")) {
+                if (keyText.equals("C")) {
                     btn.getStyleClass().add("btn-keypad-action");
+                } else if (keyText.equals("+") || keyText.equals("-") || keyText.equals("×") || keyText.equals("÷")) {
+                    btn.getStyleClass().add("btn-keypad-operator");
                 }
 
                 btn.setOnAction(e -> handleKeypadPress(keyText));
                 grid.add(btn, c, r);
             }
         }
+
+        Button backspaceBtn = new Button("⌫");
+        backspaceBtn.getStyleClass().addAll("btn-keypad", "btn-keypad-action");
+        backspaceBtn.setMaxWidth(Double.MAX_VALUE);
+        backspaceBtn.setOnAction(e -> handleKeypadPress("⌫"));
+        grid.add(backspaceBtn, 0, 4, 2, 1);
+
+        Button equalsBtn = new Button("=");
+        equalsBtn.getStyleClass().addAll("btn-keypad", "btn-keypad-equals");
+        equalsBtn.setMaxWidth(Double.MAX_VALUE);
+        equalsBtn.setOnAction(e -> handleKeypadPress("="));
+        grid.add(equalsBtn, 2, 4, 2, 1);
+
         return grid;
     }
 
-    private void handleKeypadPress(String key) {
-        maxStockIndicator.setVisible(false);
-
-        if (key.equals("C")) {
-            qtyBuffer.setLength(0);
-            qtyBuffer.append("1");
-            freshEntry = true;
-            selectedQuantity = 1;
-        } else if (key.equals("⌫")) {
-            if (qtyBuffer.length() > 1) {
-                qtyBuffer.deleteCharAt(qtyBuffer.length() - 1);
-                selectedQuantity = Integer.parseInt(qtyBuffer.toString());
-            } else {
-                qtyBuffer.setLength(0);
-                qtyBuffer.append("1");
-                freshEntry = true;
-                selectedQuantity = 1;
-            }
-        } else {
-            if (freshEntry) {
-                if (!key.equals("0")) {
-                    qtyBuffer.setLength(0);
-                    qtyBuffer.append(key);
-                    freshEntry = false;
-                }
-            } else {
-                if (qtyBuffer.length() < 4) {
-                    qtyBuffer.append(key);
-                } else {
-                    maxStockIndicator.setText("Max 4 digits (9,999)");
-                    maxStockIndicator.setVisible(true);
-                }
-            }
-            try {
-                selectedQuantity = Integer.parseInt(qtyBuffer.toString());
-                if (selectedQuantity == 0) selectedQuantity = 1;
-            } catch (NumberFormatException ignored) {
-                selectedQuantity = 1;
-            }
+    private void clearCalculatorError() {
+        if (calcErrorLabel != null) {
+            calcErrorLabel.setVisible(false);
+            calcErrorLabel.setManaged(false);
         }
-        qtyDisplayLabel.setText(String.valueOf(selectedQuantity));
     }
 
-    private void resetKeypadQuantity() {
-        qtyBuffer.setLength(0);
-        qtyBuffer.append("1");
-        freshEntry = true;
-        selectedQuantity = 1;
-        qtyDisplayLabel.setText("1");
-        maxStockIndicator.setVisible(false);
+    private void showCalculatorError(String msg) {
+        if (calcErrorLabel != null) {
+            calcErrorLabel.setText(msg);
+            calcErrorLabel.setVisible(true);
+            calcErrorLabel.setManaged(true);
+        }
+    }
+
+    private void resetCalculator() {
+        calcBuffer.setLength(0);
+        isResultMode = false;
+        clearCalculatorError();
+        updateCalculatorDisplay();
+    }
+
+    private void addPriceToCalculator(BigDecimal price) {
+        if (price == null) return;
+        clearCalculatorError();
+
+        if (isResultMode) {
+            isResultMode = false;
+        }
+
+        String priceStr = price.stripTrailingZeros().scale() <= 0
+                ? price.setScale(0).toPlainString()
+                : price.stripTrailingZeros().toPlainString();
+
+        String cur = calcBuffer.toString().trim();
+        if (cur.isEmpty()) {
+            calcBuffer.append(priceStr);
+        } else if (cur.endsWith("+") || cur.endsWith("-") || cur.endsWith("×") || cur.endsWith("÷")) {
+            calcBuffer.append(priceStr);
+        } else {
+            calcBuffer.append(" + ").append(priceStr);
+        }
+
+        updateCalculatorDisplay();
+    }
+
+    private void handleKeypadPress(String key) {
+        clearCalculatorError();
+
+        if ("C".equals(key)) {
+            resetCalculator();
+            return;
+        }
+
+        if ("⌫".equals(key)) {
+            if (isResultMode) {
+                resetCalculator();
+                return;
+            }
+            if (calcBuffer.length() > 0) {
+                String s = calcBuffer.toString();
+                if (s.endsWith(" ")) {
+                    int lastNonSpace = s.trim().length();
+                    int prevSpace = s.substring(0, lastNonSpace).lastIndexOf(' ');
+                    if (prevSpace >= 0) {
+                        calcBuffer.setLength(prevSpace);
+                    } else {
+                        calcBuffer.setLength(0);
+                    }
+                } else {
+                    calcBuffer.deleteCharAt(calcBuffer.length() - 1);
+                }
+            }
+            updateCalculatorDisplay();
+            return;
+        }
+
+        if ("=".equals(key)) {
+            String trimmed = calcBuffer.toString().trim();
+            if (trimmed.isEmpty()) {
+                return;
+            }
+            CalculatorEvaluator.EvaluationResult res = CalculatorEvaluator.evaluate(trimmed);
+            if (!res.isSuccess()) {
+                showCalculatorError(res.error() != null ? res.error() : "Error");
+            } else {
+                BigDecimal val = res.val();
+                calcExpressionLabel.setText(trimmed + " =");
+                calcTotalLabel.setText(formatCurrency(val));
+                calcBuffer.setLength(0);
+                String plain = val.stripTrailingZeros().scale() <= 0
+                        ? val.setScale(0).toPlainString()
+                        : val.stripTrailingZeros().toPlainString();
+                calcBuffer.append(plain);
+                isResultMode = true;
+            }
+            return;
+        }
+
+        if ("+".equals(key) || "-".equals(key) || "×".equals(key) || "÷".equals(key) || "*".equals(key) || "/".equals(key)) {
+            String op = key.replace('*', '×').replace('/', '÷');
+            isResultMode = false;
+
+            String cur = calcBuffer.toString().trim();
+            if (cur.isEmpty()) {
+                return; 
+            }
+
+            if (calcBuffer.length() >= 50) {
+                showCalculatorError("Max expression length reached");
+                return;
+            }
+
+            if (cur.endsWith("+") || cur.endsWith("-") || cur.endsWith("×") || cur.endsWith("÷")) {
+                int lastOpIdx = cur.lastIndexOf(' ');
+                if (lastOpIdx >= 0) {
+                    calcBuffer.setLength(lastOpIdx);
+                    calcBuffer.append(" ").append(op).append(" ");
+                } else {
+                    calcBuffer.setLength(0);
+                    calcBuffer.append(op).append(" ");
+                }
+            } else {
+                calcBuffer.append(" ").append(op).append(" ");
+            }
+
+            updateCalculatorDisplay();
+            return;
+        }
+
+        if (".".equals(key)) {
+            if (isResultMode) {
+                calcBuffer.setLength(0);
+                isResultMode = false;
+            }
+
+            String s = calcBuffer.toString();
+            int lastSpace = s.lastIndexOf(' ');
+            String currentOperand = (lastSpace >= 0) ? s.substring(lastSpace + 1) : s;
+
+            if (currentOperand.contains(".")) {
+                return; 
+            }
+
+            if (currentOperand.isEmpty()) {
+                calcBuffer.append("0.");
+            } else {
+                calcBuffer.append(".");
+            }
+
+            updateCalculatorDisplay();
+            return;
+        }
+
+        if (Character.isDigit(key.charAt(0))) {
+            if (isResultMode) {
+                calcBuffer.setLength(0);
+                isResultMode = false;
+            }
+
+            if (calcBuffer.length() >= 50) {
+                showCalculatorError("Max expression length reached");
+                return;
+            }
+
+            String s = calcBuffer.toString();
+            int lastSpace = s.lastIndexOf(' ');
+            String currentOperand = (lastSpace >= 0) ? s.substring(lastSpace + 1) : s;
+
+            if (currentOperand.contains(".")) {
+                int dotIndex = currentOperand.indexOf('.');
+                String decimals = currentOperand.substring(dotIndex + 1);
+                if (decimals.length() >= 2) {
+                    return; 
+                }
+            }
+
+            long digitCount = currentOperand.chars().filter(Character::isDigit).count();
+            if (digitCount >= 9) {
+                showCalculatorError("Max 9 digits per number");
+                return;
+            }
+
+            calcBuffer.append(key);
+            updateCalculatorDisplay();
+        }
+    }
+
+    private void handleGlobalKeyPress(KeyEvent event) {
+        if (searchField != null && searchField.isFocused()) {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                searchField.clear();
+                resetCalculator();
+                event.consume();
+            }
+            return;
+        }
+
+        KeyCode code = event.getCode();
+        String text = event.getText();
+
+        if (code == KeyCode.ENTER) {
+            handleKeypadPress("=");
+            event.consume();
+        } else if (code == KeyCode.BACK_SPACE) {
+            handleKeypadPress("⌫");
+            event.consume();
+        } else if (code == KeyCode.ESCAPE) {
+            handleKeypadPress("C");
+            event.consume();
+        } else if (code == KeyCode.ADD || "+".equals(text)) {
+            handleKeypadPress("+");
+            event.consume();
+        } else if (code == KeyCode.SUBTRACT || "-".equals(text)) {
+            handleKeypadPress("-");
+            event.consume();
+        } else if (code == KeyCode.MULTIPLY || "*".equals(text)) {
+            handleKeypadPress("×");
+            event.consume();
+        } else if (code == KeyCode.DIVIDE || "/".equals(text)) {
+            handleKeypadPress("÷");
+            event.consume();
+        } else if (code == KeyCode.PERIOD || code == KeyCode.DECIMAL || ".".equals(text)) {
+            handleKeypadPress(".");
+            event.consume();
+        } else if (code == KeyCode.EQUALS || "=".equals(text)) {
+            handleKeypadPress("=");
+            event.consume();
+        } else if (text != null && text.length() == 1 && Character.isDigit(text.charAt(0))) {
+            handleKeypadPress(text);
+            event.consume();
+        }
+    }
+
+    private void updateCalculatorDisplay() {
+        String expr = calcBuffer.toString().trim();
+        if (expr.isEmpty()) {
+            calcExpressionLabel.setText("");
+            calcTotalLabel.setText("₱0.00");
+            return;
+        }
+
+        calcExpressionLabel.setText(expr);
+
+        CalculatorEvaluator.EvaluationResult res = CalculatorEvaluator.evaluate(expr);
+        if (res.isSuccess()) {
+            calcTotalLabel.setText(formatCurrency(res.val()));
+        }
+    }
+
+    public static String formatCurrency(BigDecimal amount) {
+        if (amount == null) return "₱0.00";
+        if (amount.compareTo(BigDecimal.ZERO) < 0) {
+            return String.format(Locale.US, "-₱%,.2f", amount.abs());
+        } else {
+            return String.format(Locale.US, "₱%,.2f", amount);
+        }
     }
 
     private void loadCategoriesAndProducts() {
@@ -492,7 +720,7 @@ public class StoreTerminalView extends BorderPane implements Disposable {
         if (currentProducts.isEmpty()) return;
 
         double availableWidth = productScrollPane.getWidth() - 32;
-        if (availableWidth <= 200) availableWidth = 800; // Sensible default before layout pass
+        if (availableWidth <= 200) availableWidth = 800; 
 
         int minCardWidth = 200;
         int hgap = 16;
@@ -539,8 +767,13 @@ public class StoreTerminalView extends BorderPane implements Disposable {
             iv.setPreserveRatio(true);
             iv.setSmooth(true);
 
+            Rectangle clip = new Rectangle(100, 75);
+            clip.setArcWidth(8);
+            clip.setArcHeight(8);
+            iv.setClip(clip);
+
             AppExecutor.execute(() -> {
-                Image img = AppExecutor.getCachedImage(p.getImagePath());
+                Image img = ProductImageManager.getImage(p.getImagePath(), p.getOrganizationId(), 100, 75);
                 if (img != null) {
                     Platform.runLater(() -> {
                         imgBox.getChildren().clear();
@@ -566,6 +799,8 @@ public class StoreTerminalView extends BorderPane implements Disposable {
 
         Label price = new Label("₱" + String.format("%.2f", p.getSellingPrice()));
         price.getStyleClass().add("product-card-price");
+        price.setTooltip(new Tooltip("Add price to calculator"));
+        price.setOnMouseClicked(e -> addPriceToCalculator(p.getSellingPrice()));
         HBox.setHgrow(price, Priority.ALWAYS);
 
         Label badge = new Label(isOut ? "Out of Stock" : (p.isLowStock() ? "Low Stock" : "In Stock"));
@@ -573,15 +808,15 @@ public class StoreTerminalView extends BorderPane implements Disposable {
 
         priceRow.getChildren().addAll(price, badge);
 
-        Label stock = new Label("Stock: " + p.getStockQuantity() + " " + p.getUnit());
+        Label stock = new Label("Stock: " + p.getStockQuantity() + " " + Constants.UNIT);
         stock.getStyleClass().add("product-card-stock");
 
-        Button sellBtn = new Button(isOut ? "Unavailable" : "Sell");
+        Button sellBtn = new Button(isOut ? "Out of stock" : "Sell");
         sellBtn.getStyleClass().add("btn-sell");
         sellBtn.setMaxWidth(Double.MAX_VALUE);
         sellBtn.setDisable(isOut);
 
-        sellBtn.setOnAction(e -> executeDeduction(p));
+        sellBtn.setOnAction(e -> executeDeduction(p, 1));
 
         card.getChildren().addAll(imgBox, name, sku, priceRow, stock, sellBtn);
         return card;
@@ -595,28 +830,26 @@ public class StoreTerminalView extends BorderPane implements Disposable {
     }
 
     private void executeDeduction(Product p) {
-        int qtyToDeduct = selectedQuantity;
-        String reason = selectedReason;
+        executeDeduction(p, 1);
+    }
 
-        if (p.getStockQuantity() < qtyToDeduct) {
-            maxStockIndicator.setText("Available: " + p.getStockQuantity());
-            maxStockIndicator.setVisible(true);
-            ViewNavigator.showToast("Cannot deduct " + qtyToDeduct + ". Available stock is only " + p.getStockQuantity() + " " + p.getUnit(), true);
+    private void executeDeduction(Product p, int qtyToDeduct) {
+        if (p.isOutOfStock() || p.getStockQuantity() < qtyToDeduct) {
+            ViewNavigator.showToast(p.getName() + " is Out of Stock.", true);
             return;
         }
 
-        setCardButtonsDisabled(p.getId(), true, "Deducting...");
+        setCardButtonState(p.getId(), true, "Deducting...");
         ViewNavigator.setOperationInProgress(true);
 
         AppExecutor.execute(() -> {
             try {
-                StockMovement movement = inventoryService.deductStock(p.getId(), qtyToDeduct, reason, currentUser);
+                StockMovement movement = inventoryService.deductPosSale(p.getId(), qtyToDeduct, currentUser);
 
                 Platform.runLater(() -> {
                     p.setStockQuantity(movement.getNewStock());
-                    resetKeypadQuantity();
                     addSessionDeduction(movement);
-                    showToast("Deducted " + qtyToDeduct + " x " + p.getName(), movement);
+                    showToast("Deducted " + qtyToDeduct + " x " + p.getName());
 
                     Node card = productCardMap.get(p.getId());
                     if (card != null) {
@@ -628,7 +861,7 @@ public class StoreTerminalView extends BorderPane implements Disposable {
 
             } catch (Exception ex) {
                 Platform.runLater(() -> {
-                    setCardButtonsDisabled(p.getId(), false, p.isOutOfStock() ? "Unavailable" : "Sell");
+                    setCardButtonState(p.getId(), p.isOutOfStock(), p.isOutOfStock() ? "Out of stock" : "Sell");
                     ViewNavigator.showToast("Deduction error: " + ex.getMessage(), true);
                 });
             } finally {
@@ -637,7 +870,7 @@ public class StoreTerminalView extends BorderPane implements Disposable {
         });
     }
 
-    private void setCardButtonsDisabled(int productId, boolean disabled, String buttonText) {
+    private void setCardButtonState(int productId, boolean disabled, String buttonText) {
         Node card = productCardMap.get(productId);
         if (card instanceof VBox vb) {
             for (Node child : vb.getChildren()) {
@@ -659,7 +892,6 @@ public class StoreTerminalView extends BorderPane implements Disposable {
 
     private void renderRecentDeductions() {
         recentDeductionsBox.getChildren().clear();
-        recentRowMap.clear();
 
         DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -668,105 +900,34 @@ public class StoreTerminalView extends BorderPane implements Disposable {
             row.getStyleClass().add("recent-item-row");
             row.setAlignment(Pos.CENTER_LEFT);
 
-            boolean isUndone = item.isUndone();
-            if (isUndone) {
-                row.getStyleClass().add("undone");
-            }
-
             String timeStr = item.getCreatedAt() != null ? item.getCreatedAt().format(timeFmt) : "Just now";
             Label time = new Label(timeStr);
             time.getStyleClass().add("recent-item-time");
 
             Label text = new Label(item.getQuantity() + "x " + item.getProductName() + " (" + item.getReason() + ")");
             text.getStyleClass().add("recent-item-text");
-            if (isUndone) {
-                text.setStyle("-fx-strikethrough: true; -fx-text-fill: #94A3B8;");
-            }
             HBox.setHgrow(text, Priority.ALWAYS);
 
-            Button undoBtn = new Button(isUndone ? "Undone" : "Undo");
-            undoBtn.getStyleClass().add("btn-item-undo");
-            undoBtn.setDisable(isUndone);
-
-            undoBtn.setOnAction(e -> handleIndividualUndo(item, undoBtn, row, text));
-
-            row.getChildren().addAll(time, text, undoBtn);
+            row.getChildren().addAll(time, text);
             recentDeductionsBox.getChildren().add(row);
-            recentRowMap.put(item.getId(), row);
         }
     }
 
-    private void handleIndividualUndo(StockMovement item, Button undoBtn, HBox row, Label text) {
-        undoBtn.setDisable(true);
-        undoBtn.setText("Reverting...");
-        ViewNavigator.setOperationInProgress(true);
-
-        AppExecutor.execute(() -> {
-            try {
-                StockMovement undoResult = inventoryService.undoDeduction(item.getId(), currentUser);
-                Platform.runLater(() -> {
-                    item.setUndoneByMovementId(undoResult.getId());
-                    row.getStyleClass().add("undone");
-                    text.setStyle("-fx-strikethrough: true; -fx-text-fill: #94A3B8;");
-                    undoBtn.setText("Undone");
-                    undoBtn.setDisable(true);
-
-                    if (lastMovementForUndo != null && lastMovementForUndo.getId() == item.getId()) {
-                        hideToast();
-                    }
-
-                    executeDebouncedSearch();
-                    ViewNavigator.showToast("Restored " + item.getQuantity() + "x " + item.getProductName() + " back to stock.", false);
-                });
-            } catch (Exception ex) {
-                Platform.runLater(() -> {
-                    undoBtn.setDisable(false);
-                    undoBtn.setText("Undo");
-                    ViewNavigator.showToast("Could not undo: " + ex.getMessage(), true);
-                });
-            } finally {
-                ViewNavigator.setOperationInProgress(false);
-            }
-        });
-    }
-
     private void setupToast() {
-        toastBox = new HBox(16);
+        toastBox = new HBox();
         toastBox.getStyleClass().add("toast-container");
-        toastBox.setAlignment(Pos.CENTER_LEFT);
-        toastBox.setMaxWidth(460);
+        toastBox.setAlignment(Pos.CENTER);
+        toastBox.setMaxWidth(360);
+        toastBox.setMaxHeight(Region.USE_PREF_SIZE);
         toastBox.setVisible(false);
         toastBox.setManaged(false);
+        toastBox.setMouseTransparent(true);
 
         toastMessageLabel = new Label();
         toastMessageLabel.getStyleClass().add("toast-message");
-        HBox.setHgrow(toastMessageLabel, Priority.ALWAYS);
+        toastMessageLabel.setAlignment(Pos.CENTER);
 
-        toastUndoButton = new Button("Undo");
-        toastUndoButton.getStyleClass().add("btn-toast-undo");
-        toastUndoButton.setOnAction(e -> {
-            if (lastMovementForUndo != null) {
-                StockMovement target = lastMovementForUndo;
-                HBox row = recentRowMap.get(target.getId());
-                if (row != null) {
-                    for (Node n : row.getChildren()) {
-                        if (n instanceof Button btn && btn.getStyleClass().contains("btn-item-undo")) {
-                            for (Node t : row.getChildren()) {
-                                if (t instanceof Label lbl && lbl.getStyleClass().contains("recent-item-text")) {
-                                    handleIndividualUndo(target, btn, row, lbl);
-                                    break;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                } else {
-                    handleQuickToastUndo();
-                }
-            }
-        });
-
-        toastBox.getChildren().addAll(toastMessageLabel, toastUndoButton);
+        toastBox.getChildren().add(toastMessageLabel);
 
         StackPane.setAlignment(toastBox, Pos.BOTTOM_CENTER);
         StackPane.setMargin(toastBox, new Insets(0, 0, 24, 0));
@@ -774,55 +935,53 @@ public class StoreTerminalView extends BorderPane implements Disposable {
         rootOverlay.getChildren().add(toastBox);
     }
 
-    private void showToast(String message, StockMovement movement) {
-        this.lastMovementForUndo = movement;
+    private void showToast(String message) {
+        if (toastFadeIn != null) toastFadeIn.stop();
+        if (toastStay != null) toastStay.stop();
+        if (toastFadeOut != null) toastFadeOut.stop();
+
         toastMessageLabel.setText(message);
+        toastBox.setOpacity(0.0);
         toastBox.setVisible(true);
         toastBox.setManaged(true);
 
-        if (toastTimer != null) toastTimer.stop();
+        toastFadeIn = new FadeTransition(Duration.millis(150), toastBox);
+        toastFadeIn.setFromValue(0.0);
+        toastFadeIn.setToValue(1.0);
 
-        toastTimer = new Timeline(new KeyFrame(Duration.seconds(10), e -> hideToast()));
-        toastTimer.play();
+        toastStay = new PauseTransition(Duration.seconds(2));
+
+        toastFadeOut = new FadeTransition(Duration.millis(250), toastBox);
+        toastFadeOut.setFromValue(1.0);
+        toastFadeOut.setToValue(0.0);
+        toastFadeOut.setOnFinished(e -> {
+            toastBox.setVisible(false);
+            toastBox.setManaged(false);
+        });
+
+        toastFadeIn.setOnFinished(e -> toastStay.play());
+        toastStay.setOnFinished(e -> toastFadeOut.play());
+
+        toastFadeIn.play();
     }
 
     private void hideToast() {
+        if (toastFadeIn != null) toastFadeIn.stop();
+        if (toastStay != null) toastStay.stop();
+        if (toastFadeOut != null) toastFadeOut.stop();
         toastBox.setVisible(false);
         toastBox.setManaged(false);
-        lastMovementForUndo = null;
-    }
-
-    private void handleQuickToastUndo() {
-        if (lastMovementForUndo == null) return;
-        StockMovement mov = lastMovementForUndo;
-        hideToast();
-        ViewNavigator.setOperationInProgress(true);
-
-        AppExecutor.execute(() -> {
-            try {
-                StockMovement undoResult = inventoryService.undoDeduction(mov.getId(), currentUser);
-                Platform.runLater(() -> {
-                    mov.setUndoneByMovementId(undoResult.getId());
-                    renderRecentDeductions();
-                    executeDebouncedSearch();
-                    ViewNavigator.showToast("Restored " + mov.getQuantity() + "x " + mov.getProductName() + " back to stock.", false);
-                });
-            } catch (Exception ex) {
-                Platform.runLater(() -> ViewNavigator.showToast("Undo failed: " + ex.getMessage(), true));
-            } finally {
-                ViewNavigator.setOperationInProgress(false);
-            }
-        });
     }
 
     @Override
     public void dispose() {
-        if (toastTimer != null) {
-            toastTimer.stop();
-        }
+        hideToast();
         searchDebounce.stop();
         if (productScrollPane != null && scrollWidthListener != null) {
             productScrollPane.widthProperty().removeListener(scrollWidthListener);
+        }
+        if (getScene() != null && keyEventFilter != null) {
+            getScene().removeEventFilter(KeyEvent.KEY_PRESSED, keyEventFilter);
         }
         sessionDeductions.clear();
         productCardMap.clear();

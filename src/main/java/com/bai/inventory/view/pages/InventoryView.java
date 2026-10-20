@@ -10,6 +10,8 @@ import com.bai.inventory.model.User;
 import com.bai.inventory.service.AuthService;
 import com.bai.inventory.service.InventoryService;
 import com.bai.inventory.util.AppExecutor;
+import com.bai.inventory.util.Constants;
+import com.bai.inventory.util.ProductImageManager;
 import com.bai.inventory.view.Disposable;
 import com.bai.inventory.view.component.*;
 import com.bai.inventory.view.navigation.ViewNavigator;
@@ -186,12 +188,13 @@ public class InventoryView extends VBox implements Disposable {
                     box.getStyleClass().add("card");
                     box.setPadding(Insets.EMPTY);
 
-                    Image img = AppExecutor.getCachedImage(item.getImagePath(), 40, 40);
+                    Image img = ProductImageManager.getImage(item.getImagePath(), item.getOrganizationId(), 40, 40);
                     if (img != null) {
                         ImageView iv = new ImageView(img);
                         iv.setFitWidth(38);
                         iv.setFitHeight(38);
                         iv.setPreserveRatio(true);
+                        iv.setSmooth(true);
                         box.getChildren().add(iv);
                     } else {
                         SVGPath icon = new SVGPath();
@@ -263,10 +266,10 @@ public class InventoryView extends VBox implements Disposable {
 
                     HBox countRow = new HBox(6);
                     countRow.setAlignment(Pos.CENTER_LEFT);
-                    Label qtyLbl = new Label(p.getStockQuantity() + " " + p.getUnit());
+                    Label qtyLbl = new Label(p.getStockQuantity() + " " + Constants.UNIT);
                     qtyLbl.getStyleClass().add("form-label");
 
-                    Label parLbl = new Label("(Min: " + p.getLowStockThreshold() + ")");
+                    Label parLbl = new Label("(Min: " + p.getLowStockThreshold() + " " + Constants.UNIT + ")");
                     parLbl.getStyleClass().add("form-helper");
                     countRow.getChildren().addAll(qtyLbl, parLbl);
 
@@ -495,13 +498,13 @@ public class InventoryView extends VBox implements Disposable {
 
         AppDialog dialog = new AppDialog("Add Stock - " + product.getName(), 460);
 
-        Label currentStockNotice = new Label("Current stock: " + product.getStockQuantity() + " " + product.getUnit() +
-                                            " (Par threshold: " + product.getLowStockThreshold() + ")");
+        Label currentStockNotice = new Label("Current stock: " + product.getStockQuantity() + " " + Constants.UNIT +
+                                            " (Par threshold: " + product.getLowStockThreshold() + " " + Constants.UNIT + ")");
         currentStockNotice.getStyleClass().add("form-helper");
 
         TextField qtyField = new TextField();
         qtyField.setPromptText("Enter quantity to add (e.g. 24)");
-        FormField qtyFormField = new FormField("Restock Quantity", qtyField, true, "Must be a positive integer.");
+        FormField qtyFormField = new FormField("Restock Quantity (" + Constants.UNIT + ")", qtyField, true, "Must be a positive integer.");
 
         ComboBox<String> reasonCombo = new ComboBox<>();
         reasonCombo.getItems().addAll("RESTOCK", "OPENING_STOCK", "OTHER");
@@ -531,7 +534,7 @@ public class InventoryView extends VBox implements Disposable {
                 qty = Integer.parseInt(qtyStr);
                 if (qty <= 0) throw new NumberFormatException();
             } catch (NumberFormatException ex) {
-                qtyFormField.setError("Enter a valid integer greater than zero.");
+                qtyFormField.setError("Please enter a whole number of pieces.");
                 return;
             }
 
@@ -549,7 +552,7 @@ public class InventoryView extends VBox implements Disposable {
                     );
                     Platform.runLater(() -> {
                         ViewNavigator.hideOverlayDialog();
-                        ViewNavigator.showToast("Successfully added " + qty + " units to " + product.getName() + " (Ref: " + sm.getReferenceNo() + ")", false);
+                        ViewNavigator.showToast("Successfully added " + qty + " " + Constants.UNIT + " to " + product.getName() + " (Ref: " + sm.getReferenceNo() + ")", false);
                         loadDataAsync();
                     });
                 } catch (Exception ex) {
@@ -569,12 +572,12 @@ public class InventoryView extends VBox implements Disposable {
     private void openDeductDialog(Product product) {
         AppDialog dialog = new AppDialog("Deduct Stock - " + product.getName(), 460);
 
-        Label currentStockNotice = new Label("Current available stock: " + product.getStockQuantity() + " " + product.getUnit());
+        Label currentStockNotice = new Label("Current available stock: " + product.getStockQuantity() + " " + Constants.UNIT);
         currentStockNotice.getStyleClass().add("form-helper");
 
         TextField qtyField = new TextField();
         qtyField.setPromptText("Enter quantity to deduct (max " + product.getStockQuantity() + ")");
-        FormField qtyFormField = new FormField("Deduction Quantity", qtyField, true, "Cannot exceed current available stock.");
+        FormField qtyFormField = new FormField("Deduction Quantity (" + Constants.UNIT + ")", qtyField, true, "Cannot exceed current available stock.");
 
         ComboBox<String> reasonCombo = new ComboBox<>();
         reasonCombo.getItems().addAll("SOLD", "USED", "DAMAGED", "EXPIRED");
@@ -600,12 +603,12 @@ public class InventoryView extends VBox implements Disposable {
                 qty = Integer.parseInt(qtyStr);
                 if (qty <= 0) throw new NumberFormatException();
             } catch (NumberFormatException ex) {
-                qtyFormField.setError("Enter a valid integer greater than zero.");
+                qtyFormField.setError("Please enter a whole number of pieces.");
                 return;
             }
 
             if (qty > product.getStockQuantity()) {
-                qtyFormField.setError("Cannot deduct " + qty + ". Available stock is only " + product.getStockQuantity() + ".");
+                qtyFormField.setError("Cannot deduct " + qty + " " + Constants.UNIT + ". Available stock is only " + product.getStockQuantity() + " " + Constants.UNIT + ".");
                 return;
             }
 
@@ -622,9 +625,9 @@ public class InventoryView extends VBox implements Disposable {
                     );
                     Platform.runLater(() -> {
                         ViewNavigator.hideOverlayDialog();
-                        ViewNavigator.showUndoToast(
-                                "Deducted " + qty + " units of " + product.getName() + " (" + sm.getReason() + ")",
-                                () -> handleQuickUndo(sm)
+                        ViewNavigator.showToast(
+                                "Deducted " + qty + " " + Constants.UNIT + " of " + product.getName() + " (" + sm.getReason() + ")",
+                                false
                         );
                         loadDataAsync();
                     });
@@ -650,13 +653,13 @@ public class InventoryView extends VBox implements Disposable {
 
         AppDialog dialog = new AppDialog("Audit Stock Adjustment - " + product.getName(), 480);
 
-        Label notice = new Label("System count: " + product.getStockQuantity() + " " + product.getUnit());
+        Label notice = new Label("System count: " + product.getStockQuantity() + " " + Constants.UNIT);
         notice.getStyleClass().add("form-helper");
 
         TextField physicalCountField = new TextField(String.valueOf(product.getStockQuantity()));
-        FormField physicalFormField = new FormField("Actual Physical Count", physicalCountField, true, "Enter the exact physical count verified during audit.");
+        FormField physicalFormField = new FormField("Actual Physical Count (" + Constants.UNIT + ")", physicalCountField, true, "Enter the exact physical count verified during audit.");
 
-        Label diffLabel = new Label("Difference: 0 units (No variance)");
+        Label diffLabel = new Label("Difference: 0 " + Constants.UNIT + " (No variance)");
         diffLabel.getStyleClass().add("form-label");
 
         physicalCountField.textProperty().addListener((obs, oldV, newV) -> {
@@ -664,11 +667,11 @@ public class InventoryView extends VBox implements Disposable {
                 int physical = Integer.parseInt(newV.trim());
                 int diff = physical - product.getStockQuantity();
                 if (diff == 0) {
-                    diffLabel.setText("Difference: 0 units (No variance)");
+                    diffLabel.setText("Difference: 0 " + Constants.UNIT + " (No variance)");
                 } else if (diff > 0) {
-                    diffLabel.setText("Variance: +" + diff + " units (Surplus discovered)");
+                    diffLabel.setText("Variance: +" + diff + " " + Constants.UNIT + " (Surplus discovered)");
                 } else {
-                    diffLabel.setText("Variance: " + diff + " units (Shrinkage / discrepancy)");
+                    diffLabel.setText("Variance: " + diff + " " + Constants.UNIT + " (Discrepancy / Shrinkage)");
                 }
             } catch (Exception ignored) {
                 diffLabel.setText("Variance: --");
@@ -694,7 +697,7 @@ public class InventoryView extends VBox implements Disposable {
                 physical = Integer.parseInt(countStr);
                 if (physical < 0) throw new NumberFormatException();
             } catch (NumberFormatException ex) {
-                physicalFormField.setError("Physical count must be a non-negative integer.");
+                physicalFormField.setError("Please enter a whole number of pieces.");
                 return;
             }
 
@@ -711,7 +714,7 @@ public class InventoryView extends VBox implements Disposable {
                     );
                     Platform.runLater(() -> {
                         ViewNavigator.hideOverlayDialog();
-                        ViewNavigator.showToast("Stock adjusted to " + physical + " units (Ref: " + sm.getReferenceNo() + ")", false);
+                        ViewNavigator.showToast("Stock adjusted to " + physical + " " + Constants.UNIT + " (Ref: " + sm.getReferenceNo() + ")", false);
                         loadDataAsync();
                     });
                 } catch (Exception ex) {
@@ -920,53 +923,7 @@ public class InventoryView extends VBox implements Disposable {
         qtyCol.setCellValueFactory(m -> new SimpleStringProperty(String.valueOf(m.getValue().getQuantity())));
         qtyCol.setPrefWidth(60);
 
-        TableColumn<StockMovement, StockMovement> actionCol = new TableColumn<>("Action");
-        actionCol.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
-        actionCol.setPrefWidth(100);
-        actionCol.setCellFactory(c -> new TableCell<>() {
-            @Override
-            protected void updateItem(StockMovement sm, boolean empty) {
-                super.updateItem(sm, empty);
-                if (empty || sm == null) {
-                    setGraphic(null);
-                } else {
-                    if ("OUT".equalsIgnoreCase(sm.getMovementType())) {
-                        boolean isUndone = sm.isUndone();
-                        Button undoBtn = new Button(isUndone ? "Undone" : "Undo");
-                        undoBtn.getStyleClass().add("btn-table-action");
-                        undoBtn.getStyleClass().add(isUndone ? "btn-table-history" : "btn-table-deduct");
-                        undoBtn.setDisable(isUndone);
-
-                        undoBtn.setOnAction(e -> {
-                            undoBtn.setDisable(true);
-                            undoBtn.setText("Undoing...");
-                            AppExecutor.execute(() -> {
-                                try {
-                                    StockMovement res = inventoryService.undoDeduction(sm.getId(), currentUser);
-                                    Platform.runLater(() -> {
-                                        sm.setUndoneByMovementId(res.getId());
-                                        undoBtn.setText("Undone");
-                                        ViewNavigator.showToast("Deduction undone successfully (Restored " + sm.getQuantity() + " units)", false);
-                                        loadDataAsync();
-                                    });
-                                } catch (Exception ex) {
-                                    Platform.runLater(() -> {
-                                        undoBtn.setDisable(false);
-                                        undoBtn.setText("Undo");
-                                        ViewNavigator.showToast("Cannot undo: " + ex.getMessage(), true);
-                                    });
-                                }
-                            });
-                        });
-                        setGraphic(undoBtn);
-                    } else {
-                        setGraphic(null);
-                    }
-                }
-            }
-        });
-
-        table.getColumns().addAll(List.of(dateCol, refCol, prodCol, typeCol, reasonCol, qtyCol, actionCol));
+        table.getColumns().addAll(List.of(dateCol, refCol, prodCol, typeCol, reasonCol, qtyCol));
 
         Runnable fetchMovements = () -> {
             String selectedType = typeFilter.getValue();
@@ -992,22 +949,6 @@ public class InventoryView extends VBox implements Disposable {
 
         dialog.setFooterButtons(closeBtn);
         dialog.show();
-    }
-
-    private void handleQuickUndo(StockMovement movement) {
-        if (movement == null) return;
-        AppExecutor.execute(() -> {
-            try {
-                StockMovement undoRes = inventoryService.undoDeduction(movement.getId(), currentUser);
-                Platform.runLater(() -> {
-                    movement.setUndoneByMovementId(undoRes.getId());
-                    ViewNavigator.showToast("Restored " + movement.getQuantity() + " units (Undo Ref: " + undoRes.getReferenceNo() + ")", false);
-                    loadDataAsync();
-                });
-            } catch (Exception ex) {
-                Platform.runLater(() -> ViewNavigator.showToast("Undo failed: " + ex.getMessage(), true));
-            }
-        });
     }
 
     private HBox createIconLabel(String svgPath, String text) {

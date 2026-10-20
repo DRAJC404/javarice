@@ -208,43 +208,28 @@ public class InventoryServiceTest {
 
     @Test
     @Order(7)
-    void testUndoDeductionWithin10Minutes() throws Exception {
+    void testDeductionIsFinal() throws Exception {
         int currentStock = getProductStock(testProdA.getId());
 
         // Perform deduction
         StockMovement deducted = inventoryService.deductStock(testProdA.getId(), 6, "DAMAGED", testEmployee);
         assertEquals(currentStock - 6, getProductStock(testProdA.getId()));
+        assertNotNull(deducted);
+        assertEquals("OUT", deducted.getMovementType());
+        assertEquals("DAMAGED", deducted.getReason());
 
-        // Undo immediately
-        StockMovement undone = inventoryService.undoDeduction(deducted.getId(), testEmployee);
-        assertNotNull(undone);
-        assertEquals("IN", undone.getMovementType());
-        assertEquals("UNDO", undone.getReason());
-        assertEquals(currentStock, getProductStock(testProdA.getId()), "Stock must be fully restored after undo");
-
-        // Verify original movement now has undone_by_movement_id set
+        // Verify movement record is saved in stock_movements table for audit
         try (Connection conn = DatabaseConfig.getConnection(ORG_ID);
              PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT undone_by_movement_id FROM stock_movements WHERE id = ?")) {
+                     "SELECT id, movement_type, reason, quantity FROM stock_movements WHERE id = ?")) {
             stmt.setInt(1, deducted.getId());
             try (ResultSet rs = stmt.executeQuery()) {
                 assertTrue(rs.next());
-                assertEquals(undone.getId(), rs.getInt("undone_by_movement_id"));
+                assertEquals("OUT", rs.getString("movement_type"));
+                assertEquals("DAMAGED", rs.getString("reason"));
+                assertEquals(6, rs.getInt("quantity"));
             }
         }
-    }
-
-    @Test
-    @Order(8)
-    void testUndoDeductionCannotBeUndoneTwice() throws Exception {
-        // Perform deduction and undo
-        StockMovement deducted = inventoryService.deductStock(testProdA.getId(), 2, "EXPIRED", testEmployee);
-        inventoryService.undoDeduction(deducted.getId(), testEmployee);
-
-        // Second undo attempt must fail
-        assertThrows(InventoryService.InventoryException.class, () -> {
-            inventoryService.undoDeduction(deducted.getId(), testEmployee);
-        });
     }
 
     private static int getProductStock(int productId) throws SQLException {

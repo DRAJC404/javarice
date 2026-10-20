@@ -146,6 +146,8 @@ CREATE TABLE products (
     low_stock_threshold INT NOT NULL DEFAULT 10 CHECK (low_stock_threshold >= 0),
     image_path VARCHAR(255),
     status VARCHAR(30) NOT NULL DEFAULT 'IN_STOCK' CHECK (status IN ('IN_STOCK', 'LOW_STOCK', 'OUT_OF_STOCK', 'DISCONTINUED')),
+    approval_status VARCHAR(20) NOT NULL DEFAULT 'APPROVED',
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     is_archived BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -157,6 +159,8 @@ CREATE INDEX idx_products_sku ON products(sku);
 CREATE INDEX idx_products_barcode ON products(barcode);
 CREATE INDEX idx_products_category ON products(category_id);
 CREATE INDEX idx_products_status ON products(status);
+CREATE INDEX idx_products_approval_status ON products(approval_status);
+CREATE INDEX idx_products_is_deleted ON products(is_deleted);
 CREATE INDEX idx_products_archived ON products(is_archived);
 CREATE INDEX idx_products_name ON products(name);
 
@@ -378,6 +382,29 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION fn_check_join_code_status(p_code_hash TEXT)
+RETURNS TABLE (
+    id INT,
+    organization_id INT,
+    role VARCHAR,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    used_at TIMESTAMP WITH TIME ZONE,
+    cancelled_at TIMESTAMP WITH TIME ZONE,
+    org_active BOOLEAN
+)
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT jc.id, jc.organization_id, jc.role, jc.expires_at, jc.used_at, jc.cancelled_at, o.is_active AS org_active
+    FROM join_codes jc
+    JOIN organizations o ON jc.organization_id = o.id
+    WHERE jc.code_hash = p_code_hash
+    LIMIT 1;
+END;
+$$ LANGUAGE plpgsql;
+
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'bai_app_user') THEN
@@ -412,16 +439,16 @@ INSERT INTO categories (id, name, description) VALUES
 (5, 'Store Supplies & Packaging', 'Paper cups, napkins, coffee lids, carry bags');
 
 INSERT INTO products (id, category_id, sku, barcode, name, unit, cost_price, selling_price, stock_quantity, low_stock_threshold) VALUES
-(1, 1, 'BEV-001', '8901001', 'Barako Arabica Beans 1kg', 'bag', 380.00, 650.00, 42, 15),
-(2, 1, 'BEV-002', '8901002', 'Benguet Cold Brew Keg 20L', 'keg', 1200.00, 2400.00, 3, 4),
-(3, 1, 'BEV-003', '8901003', 'Ceremonial Matcha Tin 100g', 'tin', 450.00, 850.00, 6, 10),
-(4, 2, 'BAK-001', '8902001', 'Butter Croissant (Box of 6)', 'box', 160.00, 320.00, 8, 12),
-(5, 2, 'BAK-002', '8902002', 'Special Ensaymada (4pk)', 'box', 140.00, 280.00, 18, 10),
-(6, 2, 'BAK-003', '8902003', 'Almond Danish Pack (4pk)', 'box', 150.00, 300.00, 0, 6),
-(7, 3, 'DAI-001', '8904001', 'Fresh Whole Milk 1L', 'carton', 65.00, 110.00, 7, 20),
-(8, 3, 'DAI-002', '8904002', 'Barista Oat Milk 1L', 'carton', 95.00, 175.00, 35, 15),
+(1, 1, 'BEV-001', '8901001', 'Barako Arabica Beans 1kg', 'pcs', 380.00, 650.00, 42, 15),
+(2, 1, 'BEV-002', '8901002', 'Benguet Cold Brew Keg 20L', 'pcs', 1200.00, 2400.00, 3, 4),
+(3, 1, 'BEV-003', '8901003', 'Ceremonial Matcha Tin 100g', 'pcs', 450.00, 850.00, 6, 10),
+(4, 2, 'BAK-001', '8902001', 'Butter Croissant (Box of 6)', 'pcs', 160.00, 320.00, 8, 12),
+(5, 2, 'BAK-002', '8902002', 'Special Ensaymada (4pk)', 'pcs', 140.00, 280.00, 18, 10),
+(6, 2, 'BAK-003', '8902003', 'Almond Danish Pack (4pk)', 'pcs', 150.00, 300.00, 0, 6),
+(7, 3, 'DAI-001', '8904001', 'Fresh Whole Milk 1L', 'pcs', 65.00, 110.00, 7, 20),
+(8, 3, 'DAI-002', '8904002', 'Barista Oat Milk 1L', 'pcs', 95.00, 175.00, 35, 15),
 (9, 4, 'SNK-001', '8903001', 'Roast Chicken Pesto Ciabatta', 'pcs', 90.00, 185.00, 14, 10),
-(10, 5, 'SUP-001', '8905001', 'Eco Paper Cups 12oz (50s)', 'sleeve', 75.00, 140.00, 55, 20);
+(10, 5, 'SUP-001', '8905001', 'Eco Paper Cups 12oz (50s)', 'pcs', 75.00, 140.00, 55, 20);
 
 INSERT INTO stock_movements (id, reference_no, product_id, user_id, movement_type, quantity, reason, previous_stock, new_stock, notes, created_at) VALUES
 (1, 'SM-INIT-0001', 1, 1, 'IN', 60, 'RESTOCK', 0, 60, 'Opening inventory base', CURRENT_TIMESTAMP - INTERVAL '45 days 8 hours'),

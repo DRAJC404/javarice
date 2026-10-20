@@ -16,6 +16,7 @@ public class AppDialog extends VBox {
     private final Label titleLabel;
     private final VBox bodyContainer;
     private final HBox footerContainer;
+    private Node initialFocusNode;
 
     private static final String SVG_CLOSE = "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z";
 
@@ -40,7 +41,10 @@ public class AppDialog extends VBox {
         closeIcon.setContent(SVG_CLOSE);
         closeIcon.getStyleClass().add("dialog-close-icon");
         closeBtn.setGraphic(closeIcon);
-        closeBtn.setOnAction(e -> ViewNavigator.hideOverlayDialog());
+        closeBtn.setOnAction(e -> {
+            e.consume();
+            close();
+        });
         header.setRight(closeBtn);
 
         bodyContainer = new VBox(14);
@@ -85,10 +89,20 @@ public class AppDialog extends VBox {
         return bodyContainer;
     }
 
+    public void setInitialFocusNode(Node node) {
+        this.initialFocusNode = node;
+    }
+
+    public void close() {
+        ViewNavigator.hideOverlayDialog(this);
+    }
+
     public void show() {
         ViewNavigator.showCustomDialog(this);
         javafx.application.Platform.runLater(() -> {
-            if (!footerContainer.getChildren().isEmpty()) {
+            if (initialFocusNode != null) {
+                initialFocusNode.requestFocus();
+            } else if (!footerContainer.getChildren().isEmpty()) {
                 Node primaryBtn = footerContainer.getChildren().get(footerContainer.getChildren().size() - 1);
                 primaryBtn.requestFocus();
             }

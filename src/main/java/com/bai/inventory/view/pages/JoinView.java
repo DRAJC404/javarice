@@ -16,8 +16,11 @@ import javafx.scene.layout.*;
 import javafx.scene.shape.SVGPath;
 
 import java.io.InputStream;
+import java.util.regex.Pattern;
 
 public class JoinView extends BorderPane implements Disposable {
+
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private static final String SVG_CHECK = "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z";
     private static final String SVG_EYE = "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z";
@@ -27,12 +30,19 @@ public class JoinView extends BorderPane implements Disposable {
     private final AuthService authService;
 
     private TextField codeField;
+    private Label codeErrorLabel;
     private TextField nameField;
+    private Label nameErrorLabel;
     private TextField emailField;
+    private Label emailErrorLabel;
     private PasswordField passwordField;
     private TextField visiblePasswordField;
+    private Label passwordErrorLabel;
     private PasswordField confirmPasswordField;
     private TextField visibleConfirmPasswordField;
+    private Label confirmPasswordErrorLabel;
+    private CheckBox termsCheckBox;
+    private Label termsErrorLabel;
     private Button joinButton;
     private ProgressIndicator loadingIndicator;
     private Label errorLabel;
@@ -43,6 +53,21 @@ public class JoinView extends BorderPane implements Disposable {
     private Label strengthHintLabel;
 
     private Runnable onNavigateLogin;
+
+    private boolean isNavigating = false;
+    private boolean codeDirty = false;
+    private boolean nameDirty = false;
+    private boolean emailDirty = false;
+    private boolean passwordDirty = false;
+    private boolean confirmPasswordDirty = false;
+
+    private javafx.beans.value.ChangeListener<Boolean> codeFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> nameFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> emailFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> passwordFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> visiblePasswordFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> confirmPasswordFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> visibleConfirmPasswordFocusListener;
 
     public JoinView() {
         this.authService = new AuthService();
@@ -177,21 +202,19 @@ public class JoinView extends BorderPane implements Disposable {
         form.setMaxWidth(408);
         form.setAlignment(Pos.CENTER_LEFT);
 
-        HBox brandRow = new HBox(10);
+        HBox brandRow = new HBox();
         brandRow.setAlignment(Pos.CENTER_LEFT);
+        brandRow.setPadding(new Insets(0, 0, 6, 0));
 
         try (InputStream is = getClass().getResourceAsStream("/images/bailogo.png")) {
             if (is != null) {
                 ImageView logoImg = new ImageView(new Image(is));
-                logoImg.setFitHeight(40);
+                logoImg.setFitHeight(46);
                 logoImg.setPreserveRatio(true);
+                logoImg.setSmooth(true);
                 brandRow.getChildren().add(logoImg);
             }
         } catch (Exception ignored) {}
-
-        Label brandLabel = new Label("bAI");
-        brandLabel.getStyleClass().add("brand-wordmark");
-        brandRow.getChildren().add(brandLabel);
 
         VBox titleBox = new VBox(4);
         Label title = new Label("Join Organization");
@@ -209,17 +232,85 @@ public class JoinView extends BorderPane implements Disposable {
         codeField.getStyleClass().add("input-box");
         codeField.setStyle("-fx-font-family: monospace; -fx-font-size: 15px; -fx-font-weight: 700; -fx-letter-spacing: 1px;");
 
+        codeErrorLabel = new Label();
+        codeErrorLabel.getStyleClass().add("field-error-text");
+        codeErrorLabel.setVisible(false);
+        codeErrorLabel.setManaged(false);
+
+        codeField.textProperty().addListener((obs, oldVal, newVal) -> {
+            codeDirty = true;
+            clearFieldError(codeField, codeErrorLabel);
+        });
+        codeFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && codeDirty) {
+                String code = codeField.getText() != null ? codeField.getText().trim() : "";
+                if (code.isEmpty()) {
+                    showSingleFieldError(codeField, codeErrorLabel, "Please enter your invitation code.");
+                    return;
+                }
+                String cleaned = AuthService.normalizeCode(code);
+                if (cleaned.length() != 8 || !cleaned.matches("^[A-Z0-9]{8}$")) {
+                    showSingleFieldError(codeField, codeErrorLabel, "The code should be 8 characters, like G87M-6MZK.");
+                    return;
+                }
+                clearFieldError(codeField, codeErrorLabel);
+                AppExecutor.execute(() -> {
+                    String err = authService.validateJoinCode(code);
+                    Platform.runLater(() -> {
+                        if (isNavigating) return;
+                        if (err != null) {
+                            showSingleFieldError(codeField, codeErrorLabel, err);
+                        } else {
+                            clearFieldError(codeField, codeErrorLabel);
+                        }
+                    });
+                });
+            }
+        };
+        codeField.focusedProperty().addListener(codeFocusListener);
+
         HBox nameLabel = createFieldLabel("Full Name", true);
 
         nameField = new TextField();
         nameField.setPromptText("Maria Santos");
         nameField.getStyleClass().add("input-box");
 
+        nameErrorLabel = new Label();
+        nameErrorLabel.getStyleClass().add("field-error-text");
+        nameErrorLabel.setVisible(false);
+        nameErrorLabel.setManaged(false);
+
+        nameField.textProperty().addListener((obs, oldVal, newVal) -> {
+            nameDirty = true;
+            clearFieldError(nameField, nameErrorLabel);
+        });
+        nameFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && nameDirty) validateNameField();
+        };
+        nameField.focusedProperty().addListener(nameFocusListener);
+
         HBox emailLabel = createFieldLabel("Work Email Address", true);
 
         emailField = new TextField();
         emailField.setPromptText("maria@example.com");
         emailField.getStyleClass().add("input-box");
+
+        emailErrorLabel = new Label();
+        emailErrorLabel.getStyleClass().add("field-error-text");
+        emailErrorLabel.setVisible(false);
+        emailErrorLabel.setManaged(false);
+
+        emailField.textProperty().addListener((obs, oldVal, newVal) -> {
+            emailDirty = true;
+            clearFieldError(emailField, emailErrorLabel);
+        });
+        emailFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && emailDirty) validateEmailField();
+        };
+        emailField.focusedProperty().addListener(emailFocusListener);
 
         HBox passwordLabel = createFieldLabel("Create Password", true);
 
@@ -241,8 +332,29 @@ public class JoinView extends BorderPane implements Disposable {
         StackPane.setMargin(togglePasswordBtn, new Insets(0, 10, 0, 0));
         passwordContainer.getChildren().addAll(passwordField, visiblePasswordField, togglePasswordBtn);
 
+        passwordErrorLabel = new Label();
+        passwordErrorLabel.getStyleClass().add("field-error-text");
+        passwordErrorLabel.setVisible(false);
+        passwordErrorLabel.setManaged(false);
+
+        passwordField.textProperty().addListener((obs, oldVal, newVal) -> {
+            passwordDirty = true;
+            clearPasswordError();
+            updateStrengthIndicator(newVal);
+        });
+        passwordFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && !visiblePasswordField.isFocused() && passwordDirty) validatePasswordField();
+        };
+        passwordField.focusedProperty().addListener(passwordFocusListener);
+
+        visiblePasswordFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && !passwordField.isFocused() && passwordDirty) validatePasswordField();
+        };
+        visiblePasswordField.focusedProperty().addListener(visiblePasswordFocusListener);
+
         Node strengthBar = createStrengthIndicator();
-        passwordField.textProperty().addListener((obs, oldVal, newVal) -> updateStrengthIndicator(newVal));
 
         HBox confirmPasswordLabel = createFieldLabel("Confirm Password", true);
 
@@ -263,6 +375,54 @@ public class JoinView extends BorderPane implements Disposable {
         StackPane.setAlignment(toggleConfirmBtn, Pos.CENTER_RIGHT);
         StackPane.setMargin(toggleConfirmBtn, new Insets(0, 10, 0, 0));
         confirmPasswordContainer.getChildren().addAll(confirmPasswordField, visibleConfirmPasswordField, toggleConfirmBtn);
+
+        confirmPasswordErrorLabel = new Label();
+        confirmPasswordErrorLabel.getStyleClass().add("field-error-text");
+        confirmPasswordErrorLabel.setVisible(false);
+        confirmPasswordErrorLabel.setManaged(false);
+
+        confirmPasswordField.textProperty().addListener((obs, oldVal, newVal) -> {
+            confirmPasswordDirty = true;
+            clearConfirmPasswordError();
+        });
+        confirmPasswordFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && !visibleConfirmPasswordField.isFocused() && confirmPasswordDirty) validateConfirmPasswordField();
+        };
+        confirmPasswordField.focusedProperty().addListener(confirmPasswordFocusListener);
+
+        visibleConfirmPasswordFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && !confirmPasswordField.isFocused() && confirmPasswordDirty) validateConfirmPasswordField();
+        };
+        visibleConfirmPasswordField.focusedProperty().addListener(visibleConfirmPasswordFocusListener);
+
+        HBox termsRow = new HBox(6);
+        termsRow.setAlignment(Pos.CENTER_LEFT);
+
+        termsCheckBox = new CheckBox();
+        Label termsPrefix = new Label("I agree to the");
+        termsPrefix.getStyleClass().add("auth-footer-text");
+        termsPrefix.setOnMouseClicked(e -> termsCheckBox.setSelected(!termsCheckBox.isSelected()));
+
+        Hyperlink termsLink = new Hyperlink("Terms of Service");
+        termsLink.getStyleClass().add("auth-link");
+        termsLink.setOnAction(e -> showTermsDialog());
+
+        termsRow.getChildren().addAll(termsCheckBox, termsPrefix, termsLink);
+
+        termsErrorLabel = new Label();
+        termsErrorLabel.getStyleClass().add("field-error-text");
+        termsErrorLabel.setVisible(false);
+        termsErrorLabel.setManaged(false);
+
+        termsCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
+                clearFieldError(null, termsErrorLabel);
+            }
+        });
+
+        VBox termsGroup = new VBox(4, termsRow, termsErrorLabel);
 
         errorLabel = new Label();
         errorLabel.getStyleClass().add("auth-error");
@@ -289,16 +449,18 @@ public class JoinView extends BorderPane implements Disposable {
         Hyperlink loginLink = new Hyperlink("Sign in");
         loginLink.getStyleClass().add("auth-link");
         loginLink.setOnAction(e -> {
+            isNavigating = true;
+            resetForm();
             if (onNavigateLogin != null) onNavigateLogin.run();
         });
 
         loginRow.getChildren().addAll(alreadyAccount, loginLink);
 
-        VBox codeGroup = new VBox(4, codeLabel, codeField);
-        VBox nameGroup = new VBox(4, nameLabel, nameField);
-        VBox emailGroup = new VBox(4, emailLabel, emailField);
-        VBox passwordGroup = new VBox(4, passwordLabel, passwordContainer, strengthBar);
-        VBox confirmPasswordGroup = new VBox(4, confirmPasswordLabel, confirmPasswordContainer);
+        VBox codeGroup = new VBox(4, codeLabel, codeField, codeErrorLabel);
+        VBox nameGroup = new VBox(4, nameLabel, nameField, nameErrorLabel);
+        VBox emailGroup = new VBox(4, emailLabel, emailField, emailErrorLabel);
+        VBox passwordGroup = new VBox(4, passwordLabel, passwordContainer, strengthBar, passwordErrorLabel);
+        VBox confirmPasswordGroup = new VBox(4, confirmPasswordLabel, confirmPasswordContainer, confirmPasswordErrorLabel);
 
         form.getChildren().addAll(
                 brandRow,
@@ -308,6 +470,7 @@ public class JoinView extends BorderPane implements Disposable {
                 emailGroup,
                 passwordGroup,
                 confirmPasswordGroup,
+                termsGroup,
                 errorLabel,
                 joinButton,
                 loginRow
@@ -450,48 +613,255 @@ public class JoinView extends BorderPane implements Disposable {
         return btn;
     }
 
+    private void showTermsDialog() {
+        ViewNavigator.showOverlayDialog(
+                "Terms of Service & Privacy Policy",
+                "bAI Retail Assistant Terms of Service:\n\n"
+                        + "1. Data Ownership: Your store's inventory, pricing, and movement logs remain your sole property with Row-Level Security tenant isolation.\n\n"
+                        + "2. Access Control: You agree to maintain proper credentials and safeguard invitation codes.\n\n"
+                        + "3. Accountability: All stock deductions, audits, and movements are immutably logged for shift accountability.",
+                ViewNavigator.OverlayType.INFO,
+                null
+        );
+    }
+
+    private void showFieldError(Node control, Label label, String msg) {
+        if (control != null && !control.getStyleClass().contains("input-error")) {
+            control.getStyleClass().add("input-error");
+        }
+        if (label != null) {
+            label.setText(msg);
+            label.setVisible(true);
+            label.setManaged(true);
+        }
+    }
+
+    private void clearFieldError(Node control, Label label) {
+        if (control != null) {
+            control.getStyleClass().remove("input-error");
+        }
+        if (label != null) {
+            label.setText("");
+            label.setVisible(false);
+            label.setManaged(false);
+        }
+    }
+
+    private void showSingleFieldError(Node control, Label label, String msg) {
+        clearAllErrors();
+        showFieldError(control, label, msg);
+    }
+
+    private void showPasswordError(String msg) {
+        clearAllErrors();
+        if (!passwordField.getStyleClass().contains("input-error")) {
+            passwordField.getStyleClass().add("input-error");
+        }
+        if (!visiblePasswordField.getStyleClass().contains("input-error")) {
+            visiblePasswordField.getStyleClass().add("input-error");
+        }
+        passwordErrorLabel.setText(msg);
+        passwordErrorLabel.setVisible(true);
+        passwordErrorLabel.setManaged(true);
+    }
+
+    private void clearPasswordError() {
+        passwordField.getStyleClass().remove("input-error");
+        visiblePasswordField.getStyleClass().remove("input-error");
+        passwordErrorLabel.setText("");
+        passwordErrorLabel.setVisible(false);
+        passwordErrorLabel.setManaged(false);
+    }
+
+    private void showConfirmPasswordError(String msg) {
+        clearAllErrors();
+        if (!confirmPasswordField.getStyleClass().contains("input-error")) {
+            confirmPasswordField.getStyleClass().add("input-error");
+        }
+        if (!visibleConfirmPasswordField.getStyleClass().contains("input-error")) {
+            visibleConfirmPasswordField.getStyleClass().add("input-error");
+        }
+        confirmPasswordErrorLabel.setText(msg);
+        confirmPasswordErrorLabel.setVisible(true);
+        confirmPasswordErrorLabel.setManaged(true);
+    }
+
+    private void clearConfirmPasswordError() {
+        confirmPasswordField.getStyleClass().remove("input-error");
+        visibleConfirmPasswordField.getStyleClass().remove("input-error");
+        confirmPasswordErrorLabel.setText("");
+        confirmPasswordErrorLabel.setVisible(false);
+        confirmPasswordErrorLabel.setManaged(false);
+    }
+
+    public void clearAllErrors() {
+        clearFieldError(codeField, codeErrorLabel);
+        clearFieldError(nameField, nameErrorLabel);
+        clearFieldError(emailField, emailErrorLabel);
+        clearPasswordError();
+        clearConfirmPasswordError();
+        clearFieldError(null, termsErrorLabel);
+        clearError();
+    }
+
+    public void resetForm() {
+        codeDirty = false;
+        nameDirty = false;
+        emailDirty = false;
+        passwordDirty = false;
+        confirmPasswordDirty = false;
+        if (codeField != null) codeField.clear();
+        if (nameField != null) nameField.clear();
+        if (emailField != null) emailField.clear();
+        if (passwordField != null) passwordField.clear();
+        if (visiblePasswordField != null) visiblePasswordField.clear();
+        if (confirmPasswordField != null) confirmPasswordField.clear();
+        if (visibleConfirmPasswordField != null) visibleConfirmPasswordField.clear();
+        if (termsCheckBox != null) termsCheckBox.setSelected(false);
+        clearAllErrors();
+    }
+
+    private void removeFocusListeners() {
+        if (codeField != null && codeFocusListener != null) {
+            codeField.focusedProperty().removeListener(codeFocusListener);
+        }
+        if (nameField != null && nameFocusListener != null) {
+            nameField.focusedProperty().removeListener(nameFocusListener);
+        }
+        if (emailField != null && emailFocusListener != null) {
+            emailField.focusedProperty().removeListener(emailFocusListener);
+        }
+        if (passwordField != null && passwordFocusListener != null) {
+            passwordField.focusedProperty().removeListener(passwordFocusListener);
+        }
+        if (visiblePasswordField != null && visiblePasswordFocusListener != null) {
+            visiblePasswordField.focusedProperty().removeListener(visiblePasswordFocusListener);
+        }
+        if (confirmPasswordField != null && confirmPasswordFocusListener != null) {
+            confirmPasswordField.focusedProperty().removeListener(confirmPasswordFocusListener);
+        }
+        if (visibleConfirmPasswordField != null && visibleConfirmPasswordFocusListener != null) {
+            visibleConfirmPasswordField.focusedProperty().removeListener(visibleConfirmPasswordFocusListener);
+        }
+    }
+
+    private boolean validateCodeField() {
+        String code = codeField.getText() != null ? codeField.getText().trim() : "";
+        if (code.isEmpty()) {
+            showSingleFieldError(codeField, codeErrorLabel, "Please enter your invitation code.");
+            return false;
+        }
+        String cleaned = AuthService.normalizeCode(code);
+        if (cleaned.length() != 8 || !cleaned.matches("^[A-Z0-9]{8}$")) {
+            showSingleFieldError(codeField, codeErrorLabel, "The code should be 8 characters, like G87M-6MZK.");
+            return false;
+        }
+        clearFieldError(codeField, codeErrorLabel);
+        return true;
+    }
+
+    private boolean validateNameField() {
+        String name = nameField.getText() != null ? nameField.getText().trim() : "";
+        if (name.isEmpty()) {
+            showSingleFieldError(nameField, nameErrorLabel, "Please enter your full name.");
+            return false;
+        }
+        clearFieldError(nameField, nameErrorLabel);
+        return true;
+    }
+
+    private boolean validateEmailField() {
+        String email = emailField.getText() != null ? emailField.getText().trim() : "";
+        if (email.isEmpty()) {
+            showSingleFieldError(emailField, emailErrorLabel, "Please enter your work email address.");
+            return false;
+        }
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
+            showSingleFieldError(emailField, emailErrorLabel, "That email doesn't look right. Try something like name@company.com.");
+            return false;
+        }
+        clearFieldError(emailField, emailErrorLabel);
+        return true;
+    }
+
+    private boolean validatePasswordField() {
+        String pass = passwordField.getText();
+        if (pass == null || pass.isEmpty()) {
+            showPasswordError("Please create a password.");
+            return false;
+        }
+        String err = AuthService.getPasswordValidationError(pass);
+        if (err != null) {
+            showPasswordError(err);
+            return false;
+        }
+        clearPasswordError();
+        return true;
+    }
+
+    private boolean validateConfirmPasswordField() {
+        String pass = passwordField.getText();
+        String confirm = confirmPasswordField.getText();
+        if (confirm == null || confirm.isEmpty()) {
+            showConfirmPasswordError("Please confirm your password.");
+            return false;
+        }
+        if (pass != null && !pass.equals(confirm)) {
+            showConfirmPasswordError("Passwords don't match. Please re-enter them.");
+            return false;
+        }
+        clearConfirmPasswordError();
+        return true;
+    }
+
+    private boolean validateTerms() {
+        if (!termsCheckBox.isSelected()) {
+            showSingleFieldError(null, termsErrorLabel, "Please agree to the Terms of Service to continue.");
+            return false;
+        }
+        clearFieldError(null, termsErrorLabel);
+        return true;
+    }
+
     private void handleJoin() {
+        clearAllErrors();
+
+        if (!validateCodeField()) {
+            codeField.requestFocus();
+            return;
+        }
+        if (!validateNameField()) {
+            nameField.requestFocus();
+            return;
+        }
+        if (!validateEmailField()) {
+            emailField.requestFocus();
+            return;
+        }
+        if (!validatePasswordField()) {
+            (visiblePasswordField.isVisible() ? visiblePasswordField : passwordField).requestFocus();
+            return;
+        }
+        if (!validateConfirmPasswordField()) {
+            (visibleConfirmPasswordField.isVisible() ? visibleConfirmPasswordField : confirmPasswordField).requestFocus();
+            return;
+        }
+        if (!validateTerms()) {
+            termsCheckBox.requestFocus();
+            return;
+        }
+
         String code = codeField.getText() != null ? codeField.getText().trim() : "";
         String name = nameField.getText() != null ? nameField.getText().trim() : "";
         String email = emailField.getText() != null ? emailField.getText().trim() : "";
         String pass = passwordField.getText();
         String confirm = confirmPasswordField.getText();
 
-        if (code.isEmpty()) {
-            showError("Invitation code is required.");
-            codeField.requestFocus();
-            return;
-        }
-
-        if (name.isEmpty()) {
-            showError("Full name is required.");
-            nameField.requestFocus();
-            return;
-        }
-
-        if (email.isEmpty() || !email.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-            showError("Please enter a valid work email address.");
-            emailField.requestFocus();
-            return;
-        }
-
-        if (pass == null || pass.length() < 8 || !pass.matches("^(?=.*[A-Za-z])(?=.*\\d).+$")) {
-            showError("Password must be at least 8 characters long and contain at least one letter and one number.");
-            passwordField.requestFocus();
-            return;
-        }
-
-        if (!pass.equals(confirm)) {
-            showError("Passwords do not match.");
-            confirmPasswordField.requestFocus();
-            return;
-        }
-
         setLoading(true);
 
         AppExecutor.execute(() -> {
             try {
-                User user = authService.redeemCode(code, name, email, pass, confirm);
+                User user = authService.redeemCode(code, name, email, pass, confirm, termsCheckBox.isSelected());
 
                 Platform.runLater(() -> {
                     setLoading(false);
@@ -513,18 +883,36 @@ public class JoinView extends BorderPane implements Disposable {
             } catch (AuthService.ValidationException ve) {
                 Platform.runLater(() -> {
                     setLoading(false);
-                    showError(ve.getMessage());
+                    clearAllErrors();
+                    String msg = ve.getMessage();
+                    if (msg != null && (msg.toLowerCase().contains("code") || msg.toLowerCase().contains("invitation"))) {
+                        showFieldError(codeField, codeErrorLabel, msg);
+                        codeField.requestFocus();
+                    } else if (msg != null && (msg.toLowerCase().contains("email") || msg.toLowerCase().contains("account with this email"))) {
+                        showFieldError(emailField, emailErrorLabel, msg);
+                        emailField.requestFocus();
+                    } else if (msg != null && msg.toLowerCase().contains("password")) {
+                        showPasswordError(msg);
+                        (visiblePasswordField.isVisible() ? visiblePasswordField : passwordField).requestFocus();
+                    } else if (msg != null && msg.toLowerCase().contains("terms of service")) {
+                        showFieldError(null, termsErrorLabel, msg);
+                        termsCheckBox.requestFocus();
+                    } else {
+                        showError(msg);
+                    }
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
                     setLoading(false);
-                    showError(ex.getMessage() != null ? ex.getMessage() : "Error completing registration.");
+                    clearAllErrors();
+                    showError("Something went wrong on our side. Please try again in a moment.");
                 });
             }
         });
     }
 
     private void showError(String msg) {
+        clearAllErrors();
         errorLabel.setText(msg);
         errorLabel.setVisible(true);
     }
@@ -560,9 +948,8 @@ public class JoinView extends BorderPane implements Disposable {
 
     @Override
     public void dispose() {
-        if (passwordField != null) passwordField.clear();
-        if (visiblePasswordField != null) visiblePasswordField.clear();
-        if (confirmPasswordField != null) confirmPasswordField.clear();
-        if (visibleConfirmPasswordField != null) visibleConfirmPasswordField.clear();
+        isNavigating = true;
+        removeFocusListeners();
+        resetForm();
     }
 }

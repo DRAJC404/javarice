@@ -87,8 +87,8 @@ public class JoinCode {
 
     public String getStatusString() {
         if (isUsed()) return "USED";
-        if (isCancelled()) return "CANCELLED";
         if (isExpired()) return "EXPIRED";
+        if (isCancelled()) return "CANCELLED";
         return "PENDING";
     }
 }

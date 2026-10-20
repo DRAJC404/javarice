@@ -44,42 +44,11 @@ public class AppExecutor {
     }
 
     public static Image getCachedImage(String path, int width, int height) {
-        return getCachedImage(path);
+        return ProductImageManager.getImage(path, 1, width, height);
     }
 
     public static Image getCachedImage(String path) {
-        if (path == null || path.trim().isEmpty()) return null;
-        String cleanPath = path.trim();
-        try {
-            synchronized (IMAGE_CACHE) {
-                Image cached = IMAGE_CACHE.get(cleanPath);
-                if (cached != null) return cached;
-            }
-
-            Image loaded = null;
-            if (cleanPath.startsWith("/")) {
-                try (InputStream is = AppExecutor.class.getResourceAsStream(cleanPath)) {
-                    if (is != null) {
-                        loaded = new Image(is, 200, 200, true, true);
-                    }
-                }
-            } else {
-                File f = new File(cleanPath);
-                if (f.exists() && f.isFile()) {
-                    loaded = new Image(f.toURI().toString(), 200, 200, true, true);
-                }
-            }
-
-            if (loaded != null && !loaded.isError()) {
-                synchronized (IMAGE_CACHE) {
-                    IMAGE_CACHE.put(cleanPath, loaded);
-                }
-                return loaded;
-            }
-        } catch (Throwable e) {
-            System.err.println("[AppExecutor] Could not load image: " + cleanPath + " (" + e.getMessage() + ")");
-        }
-        return null;
+        return ProductImageManager.getImage(path, 1, 200, 200);
     }
 
     public static void shutdown() {

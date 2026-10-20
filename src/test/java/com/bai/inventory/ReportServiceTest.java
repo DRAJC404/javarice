@@ -74,7 +74,7 @@ public class ReportServiceTest {
 
             // Products for Org B:
             s.executeUpdate("INSERT INTO products (id, organization_id, category_id, name, sku, barcode, stock_quantity, low_stock_threshold, cost_price, selling_price, unit, is_archived) " +
-                    "VALUES (91201, " + ORG_B_ID + ", 91201, 'Coffee Beans', 'COF-01', 'BAR-COF', 2, 10, 30.00, 60.00, 'bag', false)");
+                    "VALUES (91201, " + ORG_B_ID + ", 91201, 'Coffee Beans', 'COF-01', 'BAR-COF', 2, 10, 30.00, 60.00, 'pcs', false)");
 
             // Stock movements for Org A
             s.executeUpdate("INSERT INTO stock_movements (organization_id, reference_no, product_id, user_id, movement_type, quantity, reason, previous_stock, new_stock, created_at) " +

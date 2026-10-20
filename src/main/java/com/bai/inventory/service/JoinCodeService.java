@@ -40,7 +40,7 @@ public class JoinCodeService {
 
         int activeCount = joinCodeDao.countActiveCodes(callerOrgId);
         if (activeCount >= MAX_ACTIVE_CODES_PER_ORG) {
-            throw new AuthService.ValidationException("Maximum limit of 5 active join codes reached. Please wait for existing codes to be redeemed/expire or cancel an unused code.");
+            throw new AuthService.ValidationException("You already have 5 active codes. Wait for one to expire or be used.");
         }
 
         StringBuilder raw = new StringBuilder(CODE_LENGTH);
@@ -99,5 +99,9 @@ public class JoinCodeService {
                 return orgId;
             }
         }
+    }
+
+    public int countActiveCodes(int organizationId) {
+        return joinCodeDao.countActiveCodes(organizationId);
     }
 }

@@ -145,13 +145,13 @@ public class ProductValidationTest {
 
     @Test
     @Order(4)
-    @DisplayName("Reject missing unit")
-    void testRejectMissingUnit() {
+    @DisplayName("Unit is always forced to pcs")
+    void testUnitAlwaysForcedToPcs() throws Exception {
         Product p = createBaseProduct();
-        p.setUnit("");
-        ProductService.ValidationException ex = assertThrows(ProductService.ValidationException.class,
-                () -> productService.createProduct(p, ownerA));
-        assertTrue(ex.hasFieldError("unit"));
+        p.setUnit("box");
+        assertEquals("pcs", p.getUnit());
+        Product created = productService.createProduct(p, ownerA);
+        assertEquals("pcs", created.getUnit());
     }
 
     @Test

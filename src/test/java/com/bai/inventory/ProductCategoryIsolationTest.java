@@ -122,7 +122,7 @@ public class ProductCategoryIsolationTest {
         p.setImagePath("/images/blend.png");
         p.setSku("HOUSE-001");
         p.setBarcode("987654321098");
-        p.setUnit("bag");
+        p.setUnit("pcs");
         p.setCostPrice(new BigDecimal("150.00"));
         p.setSellingPrice(new BigDecimal("300.00"));
         p.setStockQuantity(20);
@@ -201,5 +201,34 @@ public class ProductCategoryIsolationTest {
         assertEquals("23503", ex.getSQLState(), "Database must reject mismatched organization_id / category_id with SQLState 23503");
         assertTrue(ex.getMessage().contains("fk_products_org_category") || ex.getMessage().contains("foreign key constraint"),
                 "Constraint fk_products_org_category should be violated");
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("5. Category creation validates empty name, max 60 chars, and case-insensitive duplicates")
+    void testCategoryCreationValidation() {
+        AuthService.setCurrentUser(testOwner);
+
+        // Empty / whitespace
+        ProductService.ValidationException exEmpty = assertThrows(
+                ProductService.ValidationException.class,
+                () -> productService.createCategory("   ", "Desc", testOwner)
+        );
+        assertEquals("Please enter a category name.", exEmpty.getMessage());
+
+        // Max 60 chars
+        String tooLongName = "A".repeat(61);
+        ProductService.ValidationException exLong = assertThrows(
+                ProductService.ValidationException.class,
+                () -> productService.createCategory(tooLongName, "Desc", testOwner)
+        );
+        assertEquals("Category name must be 60 characters or fewer.", exLong.getMessage());
+
+        // Case-insensitive duplicate ("house specials" exists from test 2 "House Specials")
+        ProductService.ValidationException exDup = assertThrows(
+                ProductService.ValidationException.class,
+                () -> productService.createCategory("  house specials  ", "Another desc", testOwner)
+        );
+        assertEquals("A category with this name already exists.", exDup.getMessage());
     }
 }

@@ -4,10 +4,72 @@ import com.bai.inventory.config.DatabaseConfig;
 import com.bai.inventory.model.JoinCode;
 
 import java.sql.*;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
 public class JoinCodeDao {
+
+    public enum JoinCodeStatus {
+        VALID,
+        NOT_FOUND,
+        EXPIRED,
+        ALREADY_USED,
+        ORG_INACTIVE,
+        SYSTEM_ERROR
+    }
+
+    public record CodeValidationResult(JoinCodeStatus status, Integer organizationId, String role, Instant expiresAt, boolean isUsed) {}
+
+    public CodeValidationResult validateCodeStatus(String codeHash) {
+        return validateCodeStatus(codeHash, codeHash);
+    }
+
+    public CodeValidationResult validateCodeStatus(String rawInput, String codeHash) {
+        String normalizedInput = com.bai.inventory.service.AuthService.normalizeCode(rawInput);
+        Instant now = Instant.now();
+        String sql = "SELECT id, organization_id, role, expires_at, used_at, cancelled_at, org_active " +
+                     "FROM fn_check_join_code_status(?)";
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, codeHash);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (!rs.next()) {
+                    System.out.printf("[JoinCodeDao] Code validation - raw input: '%s', normalized input: '%s', matching row: no row, expires_at: null, used flag: false, current time: %s%n",
+                            rawInput, normalizedInput, now);
+                    return new CodeValidationResult(JoinCodeStatus.NOT_FOUND, null, null, null, false);
+                }
+                int codeId = rs.getInt("id");
+                int orgId = rs.getInt("organization_id");
+                String role = rs.getString("role");
+                Timestamp expTs = rs.getTimestamp("expires_at");
+                Instant expInstant = expTs != null ? expTs.toInstant() : null;
+                Timestamp usedTs = rs.getTimestamp("used_at");
+                boolean used = (usedTs != null);
+                Timestamp canTs = rs.getTimestamp("cancelled_at");
+                boolean cancelled = (canTs != null);
+                boolean orgActive = rs.getBoolean("org_active");
+
+                System.out.printf("[JoinCodeDao] Code validation - raw input: '%s', normalized input: '%s', matching row: [id=%d, org_id=%d, role=%s, org_active=%b, cancelled=%b], expires_at: %s, used flag: %b, current time: %s%n",
+                        rawInput, normalizedInput, codeId, orgId, role, orgActive, cancelled, expInstant, used, now);
+
+                if (used) {
+                    return new CodeValidationResult(JoinCodeStatus.ALREADY_USED, orgId, role, expInstant, true);
+                }
+                if (cancelled || (expInstant != null && expInstant.isBefore(now))) {
+                    return new CodeValidationResult(JoinCodeStatus.EXPIRED, orgId, role, expInstant, used);
+                }
+                if (!orgActive) {
+                    return new CodeValidationResult(JoinCodeStatus.ORG_INACTIVE, orgId, role, expInstant, used);
+                }
+                return new CodeValidationResult(JoinCodeStatus.VALID, orgId, role, expInstant, used);
+            }
+        } catch (SQLException e) {
+            System.err.printf("[JoinCodeDao] Code validation - raw input: '%s', normalized input: '%s', matching row: DB ERROR (%s), expires_at: null, used flag: false, current time: %s%n",
+                    rawInput, normalizedInput, e.getMessage(), now);
+            return new CodeValidationResult(JoinCodeStatus.SYSTEM_ERROR, null, null, null, false);
+        }
+    }
 
     public int countActiveCodes(int organizationId) {
         String sql = "SELECT COUNT(*) FROM join_codes " +
@@ -44,7 +106,7 @@ public class JoinCodeDao {
                 if (rs.next()) {
                     Timestamp cat = rs.getTimestamp("created_at");
                     Timestamp exp = rs.getTimestamp("expires_at");
-                    return new JoinCode(
+                    JoinCode jc = new JoinCode(
                             rs.getInt("id"),
                             rs.getInt("organization_id"),
                             rs.getString("code_hash"),
@@ -54,6 +116,10 @@ public class JoinCodeDao {
                             exp != null ? exp.toLocalDateTime() : null,
                             null, null, null
                     );
+                    if (!conn.getAutoCommit()) {
+                        conn.commit();
+                    }
+                    return jc;
                 }
             }
         }
@@ -122,7 +188,11 @@ public class JoinCodeDao {
         String sql = "DELETE FROM join_codes WHERE expires_at < NOW() - INTERVAL '1 day'";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            return stmt.executeUpdate();
+            int deleted = stmt.executeUpdate();
+            if (!conn.getAutoCommit()) {
+                conn.commit();
+            }
+            return deleted;
         } catch (SQLException e) {
             System.err.println("[JoinCodeDao] Error purging expired codes: " + e.getMessage());
             return 0;
@@ -151,6 +221,9 @@ public class JoinCodeDao {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, deviceId);
             stmt.executeUpdate();
+            if (!conn.getAutoCommit()) {
+                conn.commit();
+            }
         } catch (SQLException e) {
             System.err.println("[JoinCodeDao] Error recording join attempt: " + e.getMessage());
         }

@@ -7,6 +7,8 @@ import com.bai.inventory.model.User;
 import com.bai.inventory.service.AuthService;
 import com.bai.inventory.service.DashboardService;
 import com.bai.inventory.util.AppExecutor;
+import com.bai.inventory.util.Constants;
+import com.bai.inventory.util.ProductImageManager;
 import com.bai.inventory.view.Disposable;
 import com.bai.inventory.view.navigation.ViewNavigator;
 import javafx.application.Platform;
@@ -219,17 +221,17 @@ public class DashboardView extends StackPane implements Disposable {
         String valFormatted = pesoFormat.format(pm.totalValuation());
 
         row.getChildren().addAll(
-                createStatCard("TOTAL PRODUCTS", String.valueOf(pm.totalProducts()), "Active retail catalog SKUs", "stat-tile-blue", SVG_PACKAGE),
-                createStatCard("LOW STOCK ALERTS", String.valueOf(pm.lowStockCount()), "Below configured par levels", "stat-tile-amber", SVG_WARNING),
-                createStatCard("OUT OF STOCK", String.valueOf(pm.outOfStockCount()), "Critically depleted items", "stat-tile-red", SVG_X_CIRCLE),
-                createStatCard("DEDUCTIONS TODAY", String.valueOf(data.todayDeductions()), "Units sold, used or write-off", "stat-tile-indigo", SVG_TREND_DOWN),
-                createStatCard("TOTAL VALUATION", valFormatted, "Total retail stock value", "stat-tile-green", SVG_WALLET)
+                createStatCard("TOTAL PRODUCTS", String.valueOf(pm.totalProducts()), "Active retail catalog SKUs", "stat-icon", SVG_PACKAGE),
+                createStatCard("LOW STOCK ALERTS", String.valueOf(pm.lowStockCount()), "Below configured par levels", "stat-icon-warning", SVG_WARNING),
+                createStatCard("OUT OF STOCK", String.valueOf(pm.outOfStockCount()), "Critically depleted items", "stat-icon-danger", SVG_X_CIRCLE),
+                createStatCard("DEDUCTIONS TODAY", String.valueOf(data.todayDeductions()), "Units sold, used or write-off", "stat-icon", SVG_TREND_DOWN),
+                createStatCard("TOTAL VALUATION", valFormatted, "Total retail stock value", "stat-icon", SVG_WALLET)
         );
 
         return row;
     }
 
-    private Node createStatCard(String label, String value, String subtext, String tileStyleClass, String svgPath) {
+    private Node createStatCard(String label, String value, String subtext, String iconStyleClass, String svgPath) {
         VBox card = new VBox(4);
         card.getStyleClass().add("stat-card");
         HBox.setHgrow(card, Priority.ALWAYS);
@@ -242,11 +244,11 @@ public class DashboardView extends StackPane implements Disposable {
         HBox.setHgrow(lbl, Priority.ALWAYS);
 
         StackPane tile = new StackPane();
-        tile.getStyleClass().addAll("stat-icon-tile", tileStyleClass);
+        tile.getStyleClass().add("stat-icon-tile");
 
         SVGPath icon = new SVGPath();
         icon.setContent(svgPath);
-        icon.getStyleClass().add("stat-tile-icon");
+        icon.getStyleClass().addAll("stat-tile-icon", iconStyleClass);
         tile.getChildren().add(icon);
 
         top.getChildren().addAll(lbl, tile);
@@ -496,12 +498,13 @@ public class DashboardView extends StackPane implements Disposable {
 
         boolean hasThumb = false;
         if (p.getImagePath() != null) {
-            javafx.scene.image.Image cached = AppExecutor.getCachedImage(p.getImagePath(), 36, 36);
+            javafx.scene.image.Image cached = ProductImageManager.getImage(p.getImagePath(), p.getOrganizationId(), 36, 36);
             if (cached != null) {
                 javafx.scene.image.ImageView iv = new javafx.scene.image.ImageView(cached);
                 iv.setFitWidth(36);
                 iv.setFitHeight(36);
                 iv.setPreserveRatio(true);
+                iv.setSmooth(true);
                 thumbBox.getChildren().add(iv);
                 hasThumb = true;
             }
@@ -527,7 +530,7 @@ public class DashboardView extends StackPane implements Disposable {
         VBox countBox = new VBox(2);
         countBox.setAlignment(Pos.CENTER_RIGHT);
 
-        String countText = p.getStockQuantity() + " / " + p.getLowStockThreshold() + " " + formatPcs(p.getStockQuantity(), p.getUnit());
+        String countText = p.getStockQuantity() + " / " + p.getLowStockThreshold() + " " + Constants.UNIT;
         Label countLbl = new Label(countText);
         countLbl.setStyle("-fx-font-size: 12.5px; -fx-font-weight: 800; -fx-text-fill: " + (p.getStockQuantity() == 0 ? "#EF4444" : "#F59E0B") + ";");
 
@@ -542,9 +545,9 @@ public class DashboardView extends StackPane implements Disposable {
             ViewNavigator.showOverlayDialog(
                     "Restock Reorder Notice",
                     "Product: " + p.getName() + " (" + p.getSku() + ")\n"
-                            + "Current Stock: " + p.getStockQuantity() + " " + p.getUnit() + "\n"
-                            + "Par Level Target: " + p.getLowStockThreshold() + " " + p.getUnit() + "\n\n"
-                            + "Recommended Reorder: " + Math.max(10, p.getLowStockThreshold() * 2 - p.getStockQuantity()) + " " + p.getUnit() + ".",
+                            + "Current Stock: " + p.getStockQuantity() + " " + Constants.UNIT + "\n"
+                            + "Par Level Target: " + p.getLowStockThreshold() + " " + Constants.UNIT + "\n\n"
+                            + "Recommended Reorder: " + Math.max(10, p.getLowStockThreshold() * 2 - p.getStockQuantity()) + " " + Constants.UNIT + ".",
                     ViewNavigator.OverlayType.INFO,
                     null
             );
@@ -615,7 +618,7 @@ public class DashboardView extends StackPane implements Disposable {
         Label reasonBadge = new Label(m.getReason());
         reasonBadge.setStyle("-fx-font-size: 10.5px; -fx-font-weight: 800; -fx-text-fill: -text-muted; -fx-background-color: #E2E8F0; -fx-padding: 3 8; -fx-background-radius: 4;");
 
-        String delta = (isOut ? "-" : "+") + formatPcs(m.getQuantity(), "pc");
+        String delta = (isOut ? "-" : "+") + m.getQuantity() + " " + Constants.UNIT;
         Label qtyLbl = new Label(delta);
         qtyLbl.setStyle("-fx-font-size: 13px; -fx-font-weight: 800; -fx-text-fill: " + (isOut ? "#EF4444" : "#10B981") + ";");
 

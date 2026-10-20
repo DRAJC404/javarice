@@ -3,6 +3,7 @@ package com.bai.inventory.view.pages;
 import com.bai.inventory.model.User;
 import com.bai.inventory.service.AuthService;
 import javafx.concurrent.Task;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
@@ -26,12 +27,23 @@ public class LoginView extends BorderPane implements Disposable {
 
     private final AuthService authService;
     private TextField emailField;
+    private Label emailErrorLabel;
     private PasswordField passwordField;
     private TextField visiblePasswordField;
+    private HBox passwordContainer;
+    private Label passwordErrorLabel;
     private CheckBox rememberMeBox;
     private Button signInButton;
     private ProgressIndicator loadingIndicator;
     private Label errorLabel;
+
+    private boolean isNavigating = false;
+    private boolean emailDirty = false;
+    private boolean passwordDirty = false;
+
+    private javafx.beans.value.ChangeListener<Boolean> emailFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> passwordFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> visiblePasswordFocusListener;
 
     private Consumer<User> onLoginSuccess;
     private Runnable onNavigateRegister;
@@ -183,23 +195,19 @@ public class LoginView extends BorderPane implements Disposable {
         form.setMaxWidth(408);
         form.setAlignment(Pos.CENTER_LEFT);
 
-        HBox brandRow = new HBox(10);
+        HBox brandRow = new HBox();
         brandRow.setAlignment(Pos.CENTER_LEFT);
+        brandRow.setPadding(new Insets(0, 0, 6, 0));
 
         try (InputStream is = getClass().getResourceAsStream("/images/bailogo.png")) {
             if (is != null) {
                 ImageView logoView = new ImageView(new Image(is));
-                logoView.setFitHeight(40);
+                logoView.setFitHeight(46);
                 logoView.setPreserveRatio(true);
                 logoView.setSmooth(true);
                 brandRow.getChildren().add(logoView);
             }
         } catch (Exception ignored) {}
-
-        Label appTitle = new Label("bAI");
-        appTitle.getStyleClass().add("brand-wordmark");
-
-        brandRow.getChildren().add(appTitle);
 
         VBox titleBox = new VBox(4);
         Label title = new Label("Hi, welcome to bAI");
@@ -217,6 +225,21 @@ public class LoginView extends BorderPane implements Disposable {
         emailField.setPromptText("you@example.com");
         emailField.getStyleClass().addAll("input-box", "text-input-field");
         emailField.setOnAction(e -> (visiblePasswordField.isVisible() ? visiblePasswordField : passwordField).requestFocus());
+
+        emailErrorLabel = new Label();
+        emailErrorLabel.getStyleClass().add("field-error-text");
+        emailErrorLabel.setVisible(false);
+        emailErrorLabel.setManaged(false);
+
+        emailField.textProperty().addListener((obs, oldVal, newVal) -> {
+            emailDirty = true;
+            clearFieldError(emailField, emailErrorLabel);
+        });
+        emailFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && emailDirty) validateEmailField();
+        };
+        emailField.focusedProperty().addListener(emailFocusListener);
 
         Label passwordLabel = new Label("Password");
         passwordLabel.getStyleClass().add("text-label");
@@ -260,9 +283,30 @@ public class LoginView extends BorderPane implements Disposable {
             }
         });
 
-        HBox passwordContainer = new HBox(passwordField, visiblePasswordField, eyeToggle);
+        passwordContainer = new HBox(passwordField, visiblePasswordField, eyeToggle);
         passwordContainer.getStyleClass().add("input-box");
         passwordContainer.setAlignment(Pos.CENTER_LEFT);
+
+        passwordErrorLabel = new Label();
+        passwordErrorLabel.getStyleClass().add("field-error-text");
+        passwordErrorLabel.setVisible(false);
+        passwordErrorLabel.setManaged(false);
+
+        passwordField.textProperty().addListener((obs, oldVal, newVal) -> {
+            passwordDirty = true;
+            clearFieldError(passwordContainer, passwordErrorLabel);
+        });
+        passwordFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && !visiblePasswordField.isFocused() && passwordDirty) validatePasswordField();
+        };
+        passwordField.focusedProperty().addListener(passwordFocusListener);
+
+        visiblePasswordFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && !passwordField.isFocused() && passwordDirty) validatePasswordField();
+        };
+        visiblePasswordField.focusedProperty().addListener(visiblePasswordFocusListener);
 
         passwordField.setOnAction(e -> handleLogin());
         visiblePasswordField.setOnAction(e -> handleLogin());
@@ -288,6 +332,8 @@ public class LoginView extends BorderPane implements Disposable {
         joinButton.getStyleClass().add("btn-secondary");
         joinButton.setMaxWidth(Double.MAX_VALUE);
         joinButton.setOnAction(e -> {
+            isNavigating = true;
+            resetForm();
             if (onNavigateJoin != null) onNavigateJoin.run();
         });
 
@@ -302,14 +348,16 @@ public class LoginView extends BorderPane implements Disposable {
         Hyperlink ownerLink = new Hyperlink("Create a business account");
         ownerLink.getStyleClass().add("auth-link");
         ownerLink.setOnAction(e -> {
+            isNavigating = true;
+            resetForm();
             if (onNavigateRegister != null) onNavigateRegister.run();
         });
         ownerRow.getChildren().addAll(ownerLabel, ownerLink);
 
         footerBox.getChildren().add(ownerRow);
 
-        VBox emailGroup = new VBox(4, emailLabel, emailField);
-        VBox passwordGroup = new VBox(4, passwordLabel, passwordContainer);
+        VBox emailGroup = new VBox(4, emailLabel, emailField, emailErrorLabel);
+        VBox passwordGroup = new VBox(4, passwordLabel, passwordContainer, passwordErrorLabel);
 
         form.getChildren().addAll(
                 brandRow,
@@ -328,29 +376,100 @@ public class LoginView extends BorderPane implements Disposable {
         return scrollPane;
     }
 
-    private void handleLogin() {
+    private void showFieldError(Node control, Label label, String msg) {
+        if (control != null && !control.getStyleClass().contains("input-error")) {
+            control.getStyleClass().add("input-error");
+        }
+        if (label != null) {
+            label.setText(msg);
+            label.setVisible(true);
+            label.setManaged(true);
+        }
+    }
+
+    private void clearFieldError(Node control, Label label) {
+        if (control != null) {
+            control.getStyleClass().remove("input-error");
+        }
+        if (label != null) {
+            label.setText("");
+            label.setVisible(false);
+            label.setManaged(false);
+        }
+    }
+
+    private void showSingleFieldError(Node control, Label label, String msg) {
+        clearAllErrors();
+        showFieldError(control, label, msg);
+    }
+
+    public void clearAllErrors() {
+        clearFieldError(emailField, emailErrorLabel);
+        clearFieldError(passwordContainer, passwordErrorLabel);
+        clearError();
+    }
+
+    public void resetForm() {
+        emailDirty = false;
+        passwordDirty = false;
+        if (emailField != null) emailField.clear();
+        if (passwordField != null) passwordField.clear();
+        if (visiblePasswordField != null) visiblePasswordField.clear();
+        if (rememberMeBox != null) rememberMeBox.setSelected(false);
+        clearAllErrors();
+    }
+
+    private void removeFocusListeners() {
+        if (emailField != null && emailFocusListener != null) {
+            emailField.focusedProperty().removeListener(emailFocusListener);
+        }
+        if (passwordField != null && passwordFocusListener != null) {
+            passwordField.focusedProperty().removeListener(passwordFocusListener);
+        }
+        if (visiblePasswordField != null && visiblePasswordFocusListener != null) {
+            visiblePasswordField.focusedProperty().removeListener(visiblePasswordFocusListener);
+        }
+    }
+
+    private boolean validateEmailField() {
         String email = emailField.getText() != null ? emailField.getText().trim() : "";
-        String password = passwordField.getText();
-
         if (email.isEmpty()) {
-            showError("Email address is required.");
-            emailField.requestFocus();
-            return;
+            showSingleFieldError(emailField, emailErrorLabel, "Please enter your work email address.");
+            return false;
         }
-
         if (!EMAIL_PATTERN.matcher(email).matches()) {
-            showError("Please enter a valid email address.");
+            showSingleFieldError(emailField, emailErrorLabel, "That email doesn't look right. Try something like name@company.com.");
+            return false;
+        }
+        clearFieldError(emailField, emailErrorLabel);
+        return true;
+    }
+
+    private boolean validatePasswordField() {
+        String password = passwordField.getText();
+        if (password == null || password.isEmpty()) {
+            showSingleFieldError(passwordContainer, passwordErrorLabel, "Please enter your password.");
+            return false;
+        }
+        clearFieldError(passwordContainer, passwordErrorLabel);
+        return true;
+    }
+
+    private void handleLogin() {
+        clearAllErrors();
+
+        if (!validateEmailField()) {
             emailField.requestFocus();
             return;
         }
-
-        if (password == null || password.isEmpty()) {
-            showError("Password is required.");
+        if (!validatePasswordField()) {
             (visiblePasswordField.isVisible() ? visiblePasswordField : passwordField).requestFocus();
             return;
         }
 
-        clearError();
+        String email = emailField.getText() != null ? emailField.getText().trim() : "";
+        String password = passwordField.getText();
+
         setLoading(true);
 
         boolean rememberMe = rememberMeBox.isSelected();
@@ -372,9 +491,16 @@ public class LoginView extends BorderPane implements Disposable {
 
         loginTask.setOnFailed(e -> {
             setLoading(false);
+            clearAllErrors();
             Throwable ex = loginTask.getException();
             String msg = (ex != null && ex.getMessage() != null) ? ex.getMessage() : "Authentication failed.";
-            showError(msg);
+            if (msg.contains("Invalid email or password")) {
+                showError("Invalid email or password.");
+            } else if (msg.contains("Connection") || msg.contains("database") || msg.contains("SQLException") || msg.contains("Something went wrong")) {
+                showError("Something went wrong on our side. Please try again in a moment.");
+            } else {
+                showError(msg);
+            }
             passwordField.clear();
             visiblePasswordField.clear();
         });
@@ -383,6 +509,7 @@ public class LoginView extends BorderPane implements Disposable {
     }
 
     private void showError(String msg) {
+        clearAllErrors();
         errorLabel.setText(msg);
         errorLabel.setVisible(true);
     }
@@ -414,7 +541,8 @@ public class LoginView extends BorderPane implements Disposable {
 
     @Override
     public void dispose() {
-        passwordField.clear();
-        visiblePasswordField.clear();
+        isNavigating = true;
+        removeFocusListeners();
+        resetForm();
     }
 }

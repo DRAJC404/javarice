@@ -146,6 +146,55 @@ public class AuthService {
         clearLocalToken();
     }
 
+    public static String normalizeCode(String rawCode) {
+        if (rawCode == null) return "";
+        return rawCode.replaceAll("[\\s\\-\\u00A0\\u200B\\uFEFF]+", "").toUpperCase(java.util.Locale.ROOT).trim();
+    }
+
+    public static String getPasswordValidationError(String pass) {
+        if (pass == null || pass.isEmpty()) {
+            return "Please create a password.";
+        }
+        boolean hasMinLength = pass.length() >= 8;
+        boolean hasLetter = pass.matches(".*[A-Za-z].*");
+        boolean hasDigit = pass.matches(".*\\d.*");
+
+        if (!hasMinLength && (!hasLetter || !hasDigit)) {
+            return "Password must be at least 8 characters long and contain both letters and numbers.";
+        }
+        if (!hasMinLength) {
+            return "Password must be at least 8 characters long.";
+        }
+        if (!hasLetter) {
+            return "Password must contain at least one letter.";
+        }
+        if (!hasDigit) {
+            return "Password must contain at least one number.";
+        }
+        return null;
+    }
+
+    public String validateJoinCode(String rawCode) {
+        if (rawCode == null || rawCode.trim().isEmpty()) {
+            return "Please enter your invitation code.";
+        }
+        String normalized = normalizeCode(rawCode);
+        if (normalized.length() != 8 || !normalized.matches("^[A-Z0-9]{8}$")) {
+            return "The code should be 8 characters, like G87M-6MZK.";
+        }
+        String codeHash = PasswordUtil.sha256Hex(normalized);
+        JoinCodeDao.CodeValidationResult result = joinCodeDao.validateCodeStatus(rawCode, codeHash);
+
+        return switch (result.status()) {
+            case VALID -> null;
+            case NOT_FOUND -> "We couldn't find that code. Please check it and try again.";
+            case EXPIRED -> "This code has expired. Ask your admin to generate a new one.";
+            case ALREADY_USED -> "This code has already been used.";
+            case ORG_INACTIVE -> "The organization associated with this code is inactive.";
+            case SYSTEM_ERROR -> "Something went wrong on our side. Please try again in a moment.";
+        };
+    }
+
     public User registerBusinessOwner(String businessName, String fullName, String email, String password, String confirmPassword, boolean termsAccepted)
             throws ValidationException, AuthenticationException {
 
@@ -160,26 +209,30 @@ public class AuthService {
         }
 
         if (businessName == null || businessName.trim().isEmpty()) {
-            throw new ValidationException("Business name is required.");
+            throw new ValidationException("Please enter your business or store name.");
         }
         if (fullName == null || fullName.trim().isEmpty()) {
-            throw new ValidationException("Full name is required.");
+            throw new ValidationException("Please enter your full name.");
         }
         if (email == null || !email.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-            throw new ValidationException("Please provide a valid email address.");
+            throw new ValidationException("That email doesn't look right. Try something like name@company.com.");
         }
-        if (password == null || password.length() < 8 || !password.matches("^(?=.*[A-Za-z])(?=.*\\d).+$")) {
-            throw new ValidationException("Password must be at least 8 characters long and contain at least one letter and one number.");
+        String passErr = getPasswordValidationError(password);
+        if (passErr != null) {
+            throw new ValidationException(passErr);
+        }
+        if (confirmPassword == null || confirmPassword.isEmpty()) {
+            throw new ValidationException("Please confirm your password.");
         }
         if (!password.equals(confirmPassword)) {
-            throw new ValidationException("Passwords do not match.");
+            throw new ValidationException("Passwords don't match. Please re-enter them.");
         }
         if (!termsAccepted) {
-            throw new ValidationException("You must accept the Terms and Conditions to register.");
+            throw new ValidationException("Please agree to the Terms of Service to continue.");
         }
 
         if (userDao.isEmailTaken(email.trim())) {
-            throw new ValidationException("An account with this email address already exists.");
+            throw new ValidationException("An account with this email address already exists. Try signing in instead.");
         }
 
         String passwordHash = PasswordUtil.hash(password);
@@ -187,9 +240,9 @@ public class AuthService {
             return userDao.registerOwner(businessName.trim(), fullName.trim(), email.trim(), passwordHash);
         } catch (SQLException e) {
             if ("23505".equals(e.getSQLState())) {
-                throw new ValidationException("An account with this email address already exists.");
+                throw new ValidationException("An account with this email address already exists. Try signing in instead.");
             }
-            throw new AuthenticationException("Database error during business owner registration: " + e.getMessage());
+            throw new AuthenticationException("Something went wrong on our side. Please try again in a moment.");
         }
     }
 
@@ -216,6 +269,11 @@ public class AuthService {
 
     public User redeemCode(String rawCode, String fullName, String email, String password, String confirmPassword)
             throws ValidationException, AuthenticationException {
+        return redeemCode(rawCode, fullName, email, password, confirmPassword, true);
+    }
+
+    public User redeemCode(String rawCode, String fullName, String email, String password, String confirmPassword, boolean termsAccepted)
+            throws ValidationException, AuthenticationException {
 
         String deviceId = getDeviceId();
         int recentAttempts = joinCodeDao.countJoinAttemptsInWindow(deviceId, 1);
@@ -236,29 +294,42 @@ public class AuthService {
 
         if (rawCode == null || rawCode.trim().isEmpty()) {
             globalFailedJoinCount.incrementAndGet();
-            throw new ValidationException("Invalid or expired code.");
+            throw new ValidationException("Please enter your invitation code.");
         }
-        String cleanedCode = rawCode.trim().toUpperCase().replaceAll("[^A-Z0-9]", "");
-        if (cleanedCode.length() != 8) {
+        String cleanedCode = normalizeCode(rawCode);
+        if (cleanedCode.length() != 8 || !cleanedCode.matches("^[A-Z0-9]{8}$")) {
             globalFailedJoinCount.incrementAndGet();
-            throw new ValidationException("Invalid or expired code.");
+            throw new ValidationException("The code should be 8 characters, like G87M-6MZK.");
         }
 
         if (fullName == null || fullName.trim().isEmpty()) {
-            throw new ValidationException("Full name is required.");
+            throw new ValidationException("Please enter your full name.");
         }
-        if (email == null || !email.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-            throw new ValidationException("Please provide a valid email address.");
+        if (email == null || email.trim().isEmpty()) {
+            throw new ValidationException("Please enter your work email address.");
         }
-        if (password == null || password.length() < 8 || !password.matches("^(?=.*[A-Za-z])(?=.*\\d).+$")) {
-            throw new ValidationException("Password must be at least 8 characters long and contain at least one letter and one number.");
+        if (!email.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            throw new ValidationException("That email doesn't look right. Try something like name@company.com.");
+        }
+        String passErr = getPasswordValidationError(password);
+        if (passErr != null) {
+            throw new ValidationException(passErr);
+        }
+        if (confirmPassword == null || confirmPassword.isEmpty()) {
+            throw new ValidationException("Please confirm your password.");
         }
         if (!password.equals(confirmPassword)) {
-            throw new ValidationException("Passwords do not match.");
+            throw new ValidationException("Passwords don't match. Please re-enter them.");
+        }
+        if (!termsAccepted) {
+            throw new ValidationException("Please agree to the Terms of Service to continue.");
         }
 
         String codeHash = PasswordUtil.sha256Hex(cleanedCode);
         String passwordHash = PasswordUtil.hash(password);
+
+        System.out.printf("[JoinCodeService] Redeeming code - raw: '%s', normalized: '%s', hash: '%s', now: %s%n",
+                rawCode, cleanedCode, codeHash, java.time.Instant.now());
 
         try {
             User user = userDao.redeemJoinCode(codeHash, fullName.trim(), email.trim(), passwordHash);
@@ -269,7 +340,7 @@ public class AuthService {
             throw ve;
         } catch (SQLException e) {
             globalFailedJoinCount.incrementAndGet();
-            throw new AuthenticationException("Database error during code redemption: " + e.getMessage());
+            throw new AuthenticationException("Something went wrong on our side. Please try again in a moment.");
         }
     }
 

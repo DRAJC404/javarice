@@ -10,6 +10,7 @@ import com.bai.inventory.model.User;
 import com.bai.inventory.service.AIInsightService;
 import com.bai.inventory.service.AuthService;
 import com.bai.inventory.util.AppExecutor;
+import com.bai.inventory.util.Constants;
 import com.bai.inventory.view.Disposable;
 import com.bai.inventory.view.component.EmptyState;
 import com.bai.inventory.view.component.PageHeader;
@@ -256,7 +257,6 @@ public class AIInsightsView extends BorderPane implements Disposable {
 
         headerRow.getChildren().addAll(sparkle, titleCol);
 
-        // Prompt Chips
         HBox chipsRow = new HBox(8);
         chipsRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -277,7 +277,6 @@ public class AIInsightsView extends BorderPane implements Disposable {
             chipsRow.getChildren().add(chip);
         }
 
-        // Input row
         HBox inputRow = new HBox(10);
         inputRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -304,7 +303,6 @@ public class AIInsightsView extends BorderPane implements Disposable {
 
         inputRow.getChildren().addAll(askField, charCounter, askBtn);
 
-        // Response box
         askResponseBox = new VBox(8);
         askResponseBox.getStyleClass().add("ask-bai-response-box");
         askResponseBox.setVisible(false);
@@ -390,7 +388,6 @@ public class AIInsightsView extends BorderPane implements Disposable {
 
         for (int i = 0; i < 7; i++) {
             LocalDate day = tomorrow.plusDays(i);
-            // Gentle weekend variation simulation
             int dayOfWeek = day.getDayOfWeek().getValue();
             double factor = (dayOfWeek == 6 || dayOfWeek == 7) ? 1.25 : 0.95;
             int predicted = Math.max(1, (int) Math.round(avgDaily * factor));
@@ -476,7 +473,6 @@ public class AIInsightsView extends BorderPane implements Disposable {
         HBox row = new HBox(16);
         row.setAlignment(Pos.TOP_LEFT);
 
-        // Restock suggestions card
         VBox restockCard = new VBox(12);
         restockCard.getStyleClass().add("card");
         HBox.setHgrow(restockCard, Priority.ALWAYS);
@@ -498,13 +494,13 @@ public class AIInsightsView extends BorderPane implements Disposable {
         nameCol.setPrefWidth(160);
 
         TableColumn<Product, String> onHandCol = new TableColumn<>("Stock");
-        onHandCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getStockQuantity() + " " + d.getValue().getUnit()));
+        onHandCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getStockQuantity() + " " + Constants.UNIT));
         onHandCol.setPrefWidth(80);
 
         TableColumn<Product, String> suggestCol = new TableColumn<>("Suggested Order");
         suggestCol.setCellValueFactory(d -> {
             int reorderQty = Math.max(10, (d.getValue().getLowStockThreshold() * 2) - d.getValue().getStockQuantity());
-            return new SimpleStringProperty(reorderQty + " " + d.getValue().getUnit());
+            return new SimpleStringProperty(reorderQty + " " + Constants.UNIT);
         });
         suggestCol.setPrefWidth(110);
 
@@ -521,7 +517,6 @@ public class AIInsightsView extends BorderPane implements Disposable {
 
         restockCard.getChildren().addAll(restockTitleCol, restockTable);
 
-        // Anomalies card
         VBox anomaliesCard = new VBox(12);
         anomaliesCard.getStyleClass().add("card");
         anomaliesCard.setPrefWidth(420);

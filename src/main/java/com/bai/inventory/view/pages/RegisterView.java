@@ -16,8 +16,11 @@ import javafx.scene.layout.*;
 import javafx.scene.shape.SVGPath;
 
 import java.io.InputStream;
+import java.util.regex.Pattern;
 
 public class RegisterView extends BorderPane implements Disposable {
+
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private static final String SVG_CHECK = "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z";
     private static final String SVG_EYE = "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z";
@@ -26,12 +29,19 @@ public class RegisterView extends BorderPane implements Disposable {
     private final AuthService authService;
 
     private TextField businessNameField;
+    private Label businessNameErrorLabel;
     private TextField nameField;
+    private Label nameErrorLabel;
     private TextField emailField;
+    private Label emailErrorLabel;
     private PasswordField passwordField;
     private TextField visiblePasswordField;
+    private Label passwordErrorLabel;
     private PasswordField confirmPasswordField;
     private TextField visibleConfirmPasswordField;
+    private Label confirmPasswordErrorLabel;
+    private CheckBox termsCheckBox;
+    private Label termsErrorLabel;
     private Button registerButton;
     private ProgressIndicator loadingIndicator;
     private Label errorLabel;
@@ -42,6 +52,21 @@ public class RegisterView extends BorderPane implements Disposable {
     private Label strengthHintLabel;
 
     private Runnable onNavigateLogin;
+
+    private boolean isNavigating = false;
+    private boolean businessNameDirty = false;
+    private boolean nameDirty = false;
+    private boolean emailDirty = false;
+    private boolean passwordDirty = false;
+    private boolean confirmPasswordDirty = false;
+
+    private javafx.beans.value.ChangeListener<Boolean> businessNameFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> nameFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> emailFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> passwordFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> visiblePasswordFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> confirmPasswordFocusListener;
+    private javafx.beans.value.ChangeListener<Boolean> visibleConfirmPasswordFocusListener;
 
     public RegisterView() {
         this.authService = new AuthService();
@@ -176,22 +201,19 @@ public class RegisterView extends BorderPane implements Disposable {
         formContent.setMaxWidth(408);
         formContent.setAlignment(Pos.CENTER_LEFT);
 
-        HBox brandRow = new HBox(10);
+        HBox brandRow = new HBox();
         brandRow.setAlignment(Pos.CENTER_LEFT);
+        brandRow.setPadding(new Insets(0, 0, 6, 0));
 
         try (InputStream is = getClass().getResourceAsStream("/images/bailogo.png")) {
             if (is != null) {
                 ImageView logoImg = new ImageView(new Image(is));
-                logoImg.setFitHeight(40);
+                logoImg.setFitHeight(46);
                 logoImg.setPreserveRatio(true);
+                logoImg.setSmooth(true);
                 brandRow.getChildren().add(logoImg);
             }
         } catch (Exception ignored) {}
-
-        Label appTitle = new Label("bAI");
-        appTitle.getStyleClass().add("brand-wordmark");
-
-        brandRow.getChildren().add(appTitle);
 
         VBox titleBox = new VBox(4);
         Label headerTitle = new Label("Create Business Account");
@@ -208,17 +230,62 @@ public class RegisterView extends BorderPane implements Disposable {
         businessNameField.setPromptText("e.g. Metro Retail Hub");
         businessNameField.getStyleClass().add("input-box");
 
+        businessNameErrorLabel = new Label();
+        businessNameErrorLabel.getStyleClass().add("field-error-text");
+        businessNameErrorLabel.setVisible(false);
+        businessNameErrorLabel.setManaged(false);
+
+        businessNameField.textProperty().addListener((obs, oldVal, newVal) -> {
+            businessNameDirty = true;
+            clearFieldError(businessNameField, businessNameErrorLabel);
+        });
+        businessNameFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && businessNameDirty) validateBusinessNameField();
+        };
+        businessNameField.focusedProperty().addListener(businessNameFocusListener);
+
         HBox nameLabel = createFieldLabel("Owner Full Name", true);
 
         nameField = new TextField();
         nameField.setPromptText("e.g. Juan Dela Cruz");
         nameField.getStyleClass().add("input-box");
 
+        nameErrorLabel = new Label();
+        nameErrorLabel.getStyleClass().add("field-error-text");
+        nameErrorLabel.setVisible(false);
+        nameErrorLabel.setManaged(false);
+
+        nameField.textProperty().addListener((obs, oldVal, newVal) -> {
+            nameDirty = true;
+            clearFieldError(nameField, nameErrorLabel);
+        });
+        nameFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && nameDirty) validateNameField();
+        };
+        nameField.focusedProperty().addListener(nameFocusListener);
+
         HBox emailLabel = createFieldLabel("Work Email Address", true);
 
         emailField = new TextField();
         emailField.setPromptText("owner@store.com");
         emailField.getStyleClass().add("input-box");
+
+        emailErrorLabel = new Label();
+        emailErrorLabel.getStyleClass().add("field-error-text");
+        emailErrorLabel.setVisible(false);
+        emailErrorLabel.setManaged(false);
+
+        emailField.textProperty().addListener((obs, oldVal, newVal) -> {
+            emailDirty = true;
+            clearFieldError(emailField, emailErrorLabel);
+        });
+        emailFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && emailDirty) validateEmailField();
+        };
+        emailField.focusedProperty().addListener(emailFocusListener);
 
         HBox passLabel = createFieldLabel("Password (min. 8 characters, letters & numbers)", true);
 
@@ -234,13 +301,34 @@ public class RegisterView extends BorderPane implements Disposable {
         visiblePasswordField.setManaged(false);
 
         passwordField.textProperty().bindBidirectional(visiblePasswordField.textProperty());
-        passwordField.textProperty().addListener((obs, oldVal, newVal) -> updatePasswordStrength(newVal));
 
         Button eyeBtn1 = createEyeButton(passwordField, visiblePasswordField);
         StackPane.setAlignment(eyeBtn1, Pos.CENTER_RIGHT);
         StackPane.setMargin(eyeBtn1, new Insets(0, 8, 0, 0));
 
         passWrapper.getChildren().addAll(passwordField, visiblePasswordField, eyeBtn1);
+
+        passwordErrorLabel = new Label();
+        passwordErrorLabel.getStyleClass().add("field-error-text");
+        passwordErrorLabel.setVisible(false);
+        passwordErrorLabel.setManaged(false);
+
+        passwordField.textProperty().addListener((obs, oldVal, newVal) -> {
+            passwordDirty = true;
+            clearPasswordError();
+            updatePasswordStrength(newVal);
+        });
+        passwordFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && !visiblePasswordField.isFocused() && passwordDirty) validatePasswordField();
+        };
+        passwordField.focusedProperty().addListener(passwordFocusListener);
+
+        visiblePasswordFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && !passwordField.isFocused() && passwordDirty) validatePasswordField();
+        };
+        visiblePasswordField.focusedProperty().addListener(visiblePasswordFocusListener);
 
         Node strengthIndicator = createStrengthIndicator();
 
@@ -265,24 +353,53 @@ public class RegisterView extends BorderPane implements Disposable {
 
         confirmWrapper.getChildren().addAll(confirmPasswordField, visibleConfirmPasswordField, eyeBtn2);
 
-        HBox termsRow = new HBox(4);
+        confirmPasswordErrorLabel = new Label();
+        confirmPasswordErrorLabel.getStyleClass().add("field-error-text");
+        confirmPasswordErrorLabel.setVisible(false);
+        confirmPasswordErrorLabel.setManaged(false);
+
+        confirmPasswordField.textProperty().addListener((obs, oldVal, newVal) -> {
+            confirmPasswordDirty = true;
+            clearConfirmPasswordError();
+        });
+        confirmPasswordFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && !visibleConfirmPasswordField.isFocused() && confirmPasswordDirty) validateConfirmPasswordField();
+        };
+        confirmPasswordField.focusedProperty().addListener(confirmPasswordFocusListener);
+
+        visibleConfirmPasswordFocusListener = (obs, wasFocused, isFocused) -> {
+            if (isNavigating) return;
+            if (!isFocused && !confirmPasswordField.isFocused() && confirmPasswordDirty) validateConfirmPasswordField();
+        };
+        visibleConfirmPasswordField.focusedProperty().addListener(visibleConfirmPasswordFocusListener);
+
+        HBox termsRow = new HBox(6);
         termsRow.setAlignment(Pos.CENTER_LEFT);
-        Label termsPrefix = new Label("By registering, you agree to the");
+
+        termsCheckBox = new CheckBox();
+        Label termsPrefix = new Label("I agree to the");
         termsPrefix.getStyleClass().add("auth-footer-text");
+        termsPrefix.setOnMouseClicked(e -> termsCheckBox.setSelected(!termsCheckBox.isSelected()));
+
         Hyperlink termsLink = new Hyperlink("Terms of Service");
         termsLink.getStyleClass().add("auth-link");
-        termsLink.setOnAction(e -> {
-            ViewNavigator.showOverlayDialog(
-                    "Terms of Service & Privacy Policy",
-                    "bAI Retail Assistant Terms of Service:\n\n"
-                            + "1. Data Ownership: Your store's inventory, pricing, and movement logs remain your sole property with Row-Level Security tenant isolation.\n\n"
-                            + "2. Access Control: As Business Owner, you are responsible for authorized code generation and role assignments.\n\n"
-                            + "3. Integrity: All stock deductions, audits, and movements are immutably logged for shift accountability.",
-                    ViewNavigator.OverlayType.INFO,
-                    null
-            );
+        termsLink.setOnAction(e -> showTermsDialog());
+
+        termsRow.getChildren().addAll(termsCheckBox, termsPrefix, termsLink);
+
+        termsErrorLabel = new Label();
+        termsErrorLabel.getStyleClass().add("field-error-text");
+        termsErrorLabel.setVisible(false);
+        termsErrorLabel.setManaged(false);
+
+        termsCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
+                clearFieldError(null, termsErrorLabel);
+            }
         });
-        termsRow.getChildren().addAll(termsPrefix, termsLink);
+
+        VBox termsGroup = new VBox(4, termsRow, termsErrorLabel);
 
         errorLabel = new Label();
         errorLabel.getStyleClass().add("auth-error");
@@ -313,27 +430,20 @@ public class RegisterView extends BorderPane implements Disposable {
         Hyperlink signinLink = new Hyperlink("Sign In");
         signinLink.getStyleClass().add("auth-link");
         signinLink.setOnAction(e -> {
+            isNavigating = true;
+            resetForm();
             if (onNavigateLogin != null) onNavigateLogin.run();
             else ViewNavigator.showLogin();
         });
         loginRow.getChildren().addAll(hasAccount, signinLink);
 
-        HBox joinRow = new HBox(4);
-        joinRow.setAlignment(Pos.CENTER);
-        Label staffLabel = new Label("Staff member?");
-        staffLabel.getStyleClass().add("auth-footer-text");
-        Hyperlink joinLink = new Hyperlink("Join with a code");
-        joinLink.getStyleClass().add("auth-link");
-        joinLink.setOnAction(e -> ViewNavigator.showJoin());
-        joinRow.getChildren().addAll(staffLabel, joinLink);
+        footerBox.getChildren().add(loginRow);
 
-        footerBox.getChildren().addAll(loginRow, joinRow);
-
-        VBox businessGroup = new VBox(4, businessLabel, businessNameField);
-        VBox nameGroup = new VBox(4, nameLabel, nameField);
-        VBox emailGroup = new VBox(4, emailLabel, emailField);
-        VBox passGroup = new VBox(4, passLabel, passWrapper, strengthIndicator);
-        VBox confirmGroup = new VBox(4, confirmLabel, confirmWrapper);
+        VBox businessGroup = new VBox(4, businessLabel, businessNameField, businessNameErrorLabel);
+        VBox nameGroup = new VBox(4, nameLabel, nameField, nameErrorLabel);
+        VBox emailGroup = new VBox(4, emailLabel, emailField, emailErrorLabel);
+        VBox passGroup = new VBox(4, passLabel, passWrapper, strengthIndicator, passwordErrorLabel);
+        VBox confirmGroup = new VBox(4, confirmLabel, confirmWrapper, confirmPasswordErrorLabel);
 
         formContent.getChildren().addAll(
                 brandRow,
@@ -343,7 +453,7 @@ public class RegisterView extends BorderPane implements Disposable {
                 emailGroup,
                 passGroup,
                 confirmGroup,
-                termsRow,
+                termsGroup,
                 errorLabel,
                 submitStack,
                 footerBox
@@ -484,44 +594,250 @@ public class RegisterView extends BorderPane implements Disposable {
         }
     }
 
+    private void showTermsDialog() {
+        ViewNavigator.showOverlayDialog(
+                "Terms of Service & Privacy Policy",
+                "bAI Retail Assistant Terms of Service:\n\n"
+                        + "1. Data Ownership: Your store's inventory, pricing, and movement logs remain your sole property with Row-Level Security tenant isolation.\n\n"
+                        + "2. Access Control: As Business Owner, you are responsible for authorized code generation and role assignments.\n\n"
+                        + "3. Integrity: All stock deductions, audits, and movements are immutably logged for shift accountability.",
+                ViewNavigator.OverlayType.INFO,
+                null
+        );
+    }
+
+    private void showFieldError(Node control, Label label, String msg) {
+        if (control != null && !control.getStyleClass().contains("input-error")) {
+            control.getStyleClass().add("input-error");
+        }
+        if (label != null) {
+            label.setText(msg);
+            label.setVisible(true);
+            label.setManaged(true);
+        }
+    }
+
+    private void clearFieldError(Node control, Label label) {
+        if (control != null) {
+            control.getStyleClass().remove("input-error");
+        }
+        if (label != null) {
+            label.setText("");
+            label.setVisible(false);
+            label.setManaged(false);
+        }
+    }
+
+    private void showSingleFieldError(Node control, Label label, String msg) {
+        clearAllErrors();
+        showFieldError(control, label, msg);
+    }
+
+    private void showPasswordError(String msg) {
+        clearAllErrors();
+        if (!passwordField.getStyleClass().contains("input-error")) {
+            passwordField.getStyleClass().add("input-error");
+        }
+        if (!visiblePasswordField.getStyleClass().contains("input-error")) {
+            visiblePasswordField.getStyleClass().add("input-error");
+        }
+        passwordErrorLabel.setText(msg);
+        passwordErrorLabel.setVisible(true);
+        passwordErrorLabel.setManaged(true);
+    }
+
+    private void clearPasswordError() {
+        passwordField.getStyleClass().remove("input-error");
+        visiblePasswordField.getStyleClass().remove("input-error");
+        passwordErrorLabel.setText("");
+        passwordErrorLabel.setVisible(false);
+        passwordErrorLabel.setManaged(false);
+    }
+
+    private void showConfirmPasswordError(String msg) {
+        clearAllErrors();
+        if (!confirmPasswordField.getStyleClass().contains("input-error")) {
+            confirmPasswordField.getStyleClass().add("input-error");
+        }
+        if (!visibleConfirmPasswordField.getStyleClass().contains("input-error")) {
+            visibleConfirmPasswordField.getStyleClass().add("input-error");
+        }
+        confirmPasswordErrorLabel.setText(msg);
+        confirmPasswordErrorLabel.setVisible(true);
+        confirmPasswordErrorLabel.setManaged(true);
+    }
+
+    private void clearConfirmPasswordError() {
+        confirmPasswordField.getStyleClass().remove("input-error");
+        visibleConfirmPasswordField.getStyleClass().remove("input-error");
+        confirmPasswordErrorLabel.setText("");
+        confirmPasswordErrorLabel.setVisible(false);
+        confirmPasswordErrorLabel.setManaged(false);
+    }
+
+    public void clearAllErrors() {
+        clearFieldError(businessNameField, businessNameErrorLabel);
+        clearFieldError(nameField, nameErrorLabel);
+        clearFieldError(emailField, emailErrorLabel);
+        clearPasswordError();
+        clearConfirmPasswordError();
+        clearFieldError(null, termsErrorLabel);
+        clearError();
+    }
+
+    public void resetForm() {
+        businessNameDirty = false;
+        nameDirty = false;
+        emailDirty = false;
+        passwordDirty = false;
+        confirmPasswordDirty = false;
+        if (businessNameField != null) businessNameField.clear();
+        if (nameField != null) nameField.clear();
+        if (emailField != null) emailField.clear();
+        if (passwordField != null) passwordField.clear();
+        if (visiblePasswordField != null) visiblePasswordField.clear();
+        if (confirmPasswordField != null) confirmPasswordField.clear();
+        if (visibleConfirmPasswordField != null) visibleConfirmPasswordField.clear();
+        if (termsCheckBox != null) termsCheckBox.setSelected(false);
+        clearAllErrors();
+    }
+
+    private void removeFocusListeners() {
+        if (businessNameField != null && businessNameFocusListener != null) {
+            businessNameField.focusedProperty().removeListener(businessNameFocusListener);
+        }
+        if (nameField != null && nameFocusListener != null) {
+            nameField.focusedProperty().removeListener(nameFocusListener);
+        }
+        if (emailField != null && emailFocusListener != null) {
+            emailField.focusedProperty().removeListener(emailFocusListener);
+        }
+        if (passwordField != null && passwordFocusListener != null) {
+            passwordField.focusedProperty().removeListener(passwordFocusListener);
+        }
+        if (visiblePasswordField != null && visiblePasswordFocusListener != null) {
+            visiblePasswordField.focusedProperty().removeListener(visiblePasswordFocusListener);
+        }
+        if (confirmPasswordField != null && confirmPasswordFocusListener != null) {
+            confirmPasswordField.focusedProperty().removeListener(confirmPasswordFocusListener);
+        }
+        if (visibleConfirmPasswordField != null && visibleConfirmPasswordFocusListener != null) {
+            visibleConfirmPasswordField.focusedProperty().removeListener(visibleConfirmPasswordFocusListener);
+        }
+    }
+
+    private boolean validateBusinessNameField() {
+        String name = businessNameField.getText() != null ? businessNameField.getText().trim() : "";
+        if (name.isEmpty()) {
+            showSingleFieldError(businessNameField, businessNameErrorLabel, "Please enter your business or store name.");
+            return false;
+        }
+        clearFieldError(businessNameField, businessNameErrorLabel);
+        return true;
+    }
+
+    private boolean validateNameField() {
+        String name = nameField.getText() != null ? nameField.getText().trim() : "";
+        if (name.isEmpty()) {
+            showSingleFieldError(nameField, nameErrorLabel, "Please enter your full name.");
+            return false;
+        }
+        clearFieldError(nameField, nameErrorLabel);
+        return true;
+    }
+
+    private boolean validateEmailField() {
+        String email = emailField.getText() != null ? emailField.getText().trim() : "";
+        if (email.isEmpty()) {
+            showSingleFieldError(emailField, emailErrorLabel, "Please enter your work email address.");
+            return false;
+        }
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
+            showSingleFieldError(emailField, emailErrorLabel, "That email doesn't look right. Try something like name@company.com.");
+            return false;
+        }
+        clearFieldError(emailField, emailErrorLabel);
+        return true;
+    }
+
+    private boolean validatePasswordField() {
+        String pass = passwordField.getText();
+        if (pass == null || pass.isEmpty()) {
+            showPasswordError("Please create a password.");
+            return false;
+        }
+        String err = AuthService.getPasswordValidationError(pass);
+        if (err != null) {
+            showPasswordError(err);
+            return false;
+        }
+        clearPasswordError();
+        return true;
+    }
+
+    private boolean validateConfirmPasswordField() {
+        String pass = passwordField.getText();
+        String confirm = confirmPasswordField.getText();
+        if (confirm == null || confirm.isEmpty()) {
+            showConfirmPasswordError("Please confirm your password.");
+            return false;
+        }
+        if (pass != null && !pass.equals(confirm)) {
+            showConfirmPasswordError("Passwords don't match. Please re-enter them.");
+            return false;
+        }
+        clearConfirmPasswordError();
+        return true;
+    }
+
+    private boolean validateTerms() {
+        if (!termsCheckBox.isSelected()) {
+            showSingleFieldError(null, termsErrorLabel, "Please agree to the Terms of Service to continue.");
+            return false;
+        }
+        clearFieldError(null, termsErrorLabel);
+        return true;
+    }
+
     private void handleRegister() {
+        clearAllErrors();
+
+        if (!validateBusinessNameField()) {
+            businessNameField.requestFocus();
+            return;
+        }
+        if (!validateNameField()) {
+            nameField.requestFocus();
+            return;
+        }
+        if (!validateEmailField()) {
+            emailField.requestFocus();
+            return;
+        }
+        if (!validatePasswordField()) {
+            (visiblePasswordField.isVisible() ? visiblePasswordField : passwordField).requestFocus();
+            return;
+        }
+        if (!validateConfirmPasswordField()) {
+            (visibleConfirmPasswordField.isVisible() ? visibleConfirmPasswordField : confirmPasswordField).requestFocus();
+            return;
+        }
+        if (!validateTerms()) {
+            termsCheckBox.requestFocus();
+            return;
+        }
+
         String businessName = businessNameField.getText() != null ? businessNameField.getText().trim() : "";
         String name = nameField.getText() != null ? nameField.getText().trim() : "";
         String email = emailField.getText() != null ? emailField.getText().trim() : "";
         String pass = passwordField.getText();
         String confirm = confirmPasswordField.getText();
 
-        if (businessName.isEmpty()) {
-            showError("Business / Store name is required.");
-            businessNameField.requestFocus();
-            return;
-        }
-        if (name.isEmpty()) {
-            showError("Owner full name is required.");
-            nameField.requestFocus();
-            return;
-        }
-        if (email.isEmpty() || !email.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-            showError("Please enter a valid work email address.");
-            emailField.requestFocus();
-            return;
-        }
-        if (pass == null || pass.length() < 8 || !pass.matches("^(?=.*[A-Za-z])(?=.*\\d).+$")) {
-            showError("Password must be at least 8 characters long and contain at least one letter and one number.");
-            passwordField.requestFocus();
-            return;
-        }
-        if (!pass.equals(confirm)) {
-            showError("Passwords do not match.");
-            confirmPasswordField.requestFocus();
-            return;
-        }
-
         setLoading(true);
 
         AppExecutor.execute(() -> {
             try {
-                authService.registerBusinessOwner(businessName, name, email, pass, confirm, true);
+                authService.registerBusinessOwner(businessName, name, email, pass, confirm, termsCheckBox.isSelected());
 
                 Platform.runLater(() -> {
                     setLoading(false);
@@ -543,18 +859,39 @@ public class RegisterView extends BorderPane implements Disposable {
             } catch (AuthService.ValidationException ve) {
                 Platform.runLater(() -> {
                     setLoading(false);
-                    showError(ve.getMessage());
+                    clearAllErrors();
+                    String msg = ve.getMessage();
+                    if (msg != null && (msg.toLowerCase().contains("business") || msg.toLowerCase().contains("store name"))) {
+                        showFieldError(businessNameField, businessNameErrorLabel, msg);
+                        businessNameField.requestFocus();
+                    } else if (msg != null && msg.toLowerCase().contains("full name")) {
+                        showFieldError(nameField, nameErrorLabel, msg);
+                        nameField.requestFocus();
+                    } else if (msg != null && (msg.toLowerCase().contains("email") || msg.toLowerCase().contains("account with this email"))) {
+                        showFieldError(emailField, emailErrorLabel, msg);
+                        emailField.requestFocus();
+                    } else if (msg != null && msg.toLowerCase().contains("password")) {
+                        showPasswordError(msg);
+                        (visiblePasswordField.isVisible() ? visiblePasswordField : passwordField).requestFocus();
+                    } else if (msg != null && msg.toLowerCase().contains("terms of service")) {
+                        showFieldError(null, termsErrorLabel, msg);
+                        termsCheckBox.requestFocus();
+                    } else {
+                        showError(msg);
+                    }
                 });
             } catch (Exception ex) {
                 Platform.runLater(() -> {
                     setLoading(false);
-                    showError(ex.getMessage() != null ? ex.getMessage() : "Error creating business account.");
+                    clearAllErrors();
+                    showError("Something went wrong on our side. Please try again in a moment.");
                 });
             }
         });
     }
 
     private void showError(String msg) {
+        clearAllErrors();
         errorLabel.setText(msg);
         errorLabel.setVisible(true);
         errorLabel.setManaged(true);
@@ -590,9 +927,8 @@ public class RegisterView extends BorderPane implements Disposable {
 
     @Override
     public void dispose() {
-        if (passwordField != null) passwordField.clear();
-        if (visiblePasswordField != null) visiblePasswordField.clear();
-        if (confirmPasswordField != null) confirmPasswordField.clear();
-        if (visibleConfirmPasswordField != null) visibleConfirmPasswordField.clear();
+        isNavigating = true;
+        removeFocusListeners();
+        resetForm();
     }
 }
