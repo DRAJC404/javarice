@@ -51,8 +51,8 @@ public class ViewNavigator {
 
     public static void setPrimaryStage(Stage stage) {
         primaryStage = stage;
-        primaryStage.setMinWidth(960);
-        primaryStage.setMinHeight(640);
+        primaryStage.setMinWidth(360);
+        primaryStage.setMinHeight(480);
 
         primaryStage.setFullScreenExitHint("Press F11 to exit full screen");
         if (DatabaseConfig.isKioskModeEnabled()) {
@@ -108,7 +108,7 @@ public class ViewNavigator {
                 }
                 openInMainLayout(viewType);
             }
-            case DASHBOARD, PRODUCT, INVENTORY, ANALYTICS, AI_INSIGHTS, REPORT -> openInMainLayout(viewType);
+            case DASHBOARD, PRODUCT, CALENDAR, INVENTORY, ANALYTICS, AI_INSIGHTS, REPORT -> openInMainLayout(viewType);
         }
     }
 

@@ -161,7 +161,7 @@ public class AIInsightsView extends BorderPane implements Disposable {
 
     private Node buildHeader(AIInsightService.InsightResult result) {
         PageHeader header = new PageHeader(
-                "bAI Smart Insights & Forecasts",
+                "AI Insights",
                 "Automated demand forecasting, inventory velocity signals, and predictive restock advisories."
         );
 
