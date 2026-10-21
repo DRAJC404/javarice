@@ -361,7 +361,7 @@ public class DashboardView extends StackPane implements Disposable {
         sparkle.setContent(SVG_SPARKLE);
         sparkle.setStyle("-fx-fill: -primary;");
 
-        Label title = new Label("bAI Smart Insights");
+        Label title = new Label("AI Insights");
         title.setStyle("-fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -text-main;");
         titleBox.getChildren().addAll(sparkle, title);
         header.setLeft(titleBox);

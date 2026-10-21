@@ -30,13 +30,19 @@ import javafx.scene.shape.SVGPath;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class InventoryView extends VBox implements Disposable {
 
+    private static final Map<String, String> TYPE_LABELS = Map.of(
+            "IN", "Stock In",
+            "OUT", "Stock Out",
+            "ADJUSTMENT", "Adjustment"
+    );
+
     private static final String SVG_REFRESH   = "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z";
     private static final String SVG_HISTORY   = "M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z";
-    private static final String SVG_BULK      = "M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9h-4v4h-2v-4H9V9h4V5h2v4h4v2z";
     private static final String SVG_SEARCH    = "M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z";
     private static final String SVG_BOX       = "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z";
     private static final String SVG_ADD       = "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z";
@@ -97,28 +103,20 @@ public class InventoryView extends VBox implements Disposable {
     private void buildHeader() {
         PageHeader header = new PageHeader(
                 "Inventory Control",
-                "Track stock counts, set par thresholds, execute fast restocks, and record multi-item deductions."
+                "Track stock counts, set par thresholds, and execute fast restocks."
         );
-
-        Button bulkDeductBtn = new Button("Bulk Deduct");
-        bulkDeductBtn.getStyleClass().add("btn-secondary");
-        HBox bulkGraphic = createIconLabel(SVG_BULK, "Bulk Deduct");
-        bulkDeductBtn.setGraphic(bulkGraphic);
-        bulkDeductBtn.setOnAction(e -> openBulkDeductDialog());
 
         Button historyBtn = new Button("Movement History");
         historyBtn.getStyleClass().add("btn-secondary");
-        HBox histGraphic = createIconLabel(SVG_HISTORY, "Movement History");
-        historyBtn.setGraphic(histGraphic);
+        historyBtn.setGraphic(createIcon(SVG_HISTORY));
         historyBtn.setOnAction(e -> openMovementHistoryDialog(null));
 
         Button refreshBtn = new Button("Refresh");
         refreshBtn.getStyleClass().add("btn-secondary");
-        HBox refGraphic = createIconLabel(SVG_REFRESH, "Refresh");
-        refreshBtn.setGraphic(refGraphic);
+        refreshBtn.setGraphic(createIcon(SVG_REFRESH));
         refreshBtn.setOnAction(e -> loadDataAsync());
 
-        header.addActions(bulkDeductBtn, historyBtn, refreshBtn);
+        header.addActions(historyBtn, refreshBtn);
         getChildren().add(header);
     }
 
@@ -731,131 +729,13 @@ public class InventoryView extends VBox implements Disposable {
         dialog.show();
     }
 
-    private void openBulkDeductDialog() {
-        AppDialog dialog = new AppDialog("Bulk Stock Deduction", 640);
-
-        Label info = new Label("Add items to deduct in a single atomic transaction. All rows will be locked and validated.");
-        info.getStyleClass().add("form-helper");
-
-        VBox linesContainer = new VBox(10);
-        List<BulkRow> rows = new ArrayList<>();
-
-        Runnable addLine = () -> {
-            HBox line = new HBox(8);
-            line.setAlignment(Pos.CENTER_LEFT);
-
-            ComboBox<Product> prodCombo = new ComboBox<>();
-            prodCombo.getStyleClass().add("combo-box");
-            prodCombo.setPrefWidth(220);
-            prodCombo.getItems().addAll(allLoadedProducts.stream().filter(p -> p.getStockQuantity() > 0).toList());
-            prodCombo.setPromptText("Select product...");
-
-            TextField qtyField = new TextField("1");
-            qtyField.getStyleClass().add("text-field");
-            qtyField.setPrefWidth(70);
-
-            ComboBox<String> reasonCombo = new ComboBox<>();
-            reasonCombo.getStyleClass().add("combo-box");
-            reasonCombo.setPrefWidth(120);
-            reasonCombo.getItems().addAll("SOLD", "USED", "DAMAGED", "EXPIRED");
-            reasonCombo.getSelectionModel().selectFirst();
-
-            Button removeBtn = new Button("✕");
-            removeBtn.getStyleClass().add("btn-table-deduct");
-
-            BulkRow rowObj = new BulkRow(line, prodCombo, qtyField, reasonCombo);
-            rows.add(rowObj);
-
-            removeBtn.setOnAction(ev -> {
-                linesContainer.getChildren().remove(line);
-                rows.remove(rowObj);
-            });
-
-            line.getChildren().addAll(prodCombo, qtyField, reasonCombo, removeBtn);
-            linesContainer.getChildren().add(line);
-        };
-
-        addLine.run();
-        addLine.run();
-
-        Button addLineBtn = new Button("+ Add Line");
-        addLineBtn.getStyleClass().add("btn-secondary");
-        addLineBtn.setOnAction(e -> addLine.run());
-
-        Label errorLabel = new Label();
-        errorLabel.getStyleClass().add("form-error");
-        errorLabel.setVisible(false);
-
-        dialog.setBody(info, linesContainer, addLineBtn, errorLabel);
-
-        Button cancelBtn = new Button("Cancel");
-        cancelBtn.getStyleClass().add("btn-dialog-cancel");
-        cancelBtn.setOnAction(e -> ViewNavigator.hideOverlayDialog());
-
-        Button submitBtn = new Button("Deduct All");
-        submitBtn.getStyleClass().add("btn-dialog-confirm");
-        submitBtn.setOnAction(e -> {
-            errorLabel.setVisible(false);
-            List<InventoryService.BulkDeductionItem> items = new ArrayList<>();
-
-            for (BulkRow r : rows) {
-                Product p = r.prodCombo.getValue();
-                if (p == null) {
-                    errorLabel.setText("Please select a product for all lines, or remove empty lines.");
-                    errorLabel.setVisible(true);
-                    return;
-                }
-                int q;
-                try {
-                    q = Integer.parseInt(r.qtyField.getText().trim());
-                    if (q <= 0) throw new NumberFormatException();
-                } catch (NumberFormatException ex) {
-                    errorLabel.setText("Quantity must be a positive integer.");
-                    errorLabel.setVisible(true);
-                    return;
-                }
-                if (q > p.getStockQuantity()) {
-                    errorLabel.setText("Cannot deduct " + q + " of '" + p.getName() + "'. Available: " + p.getStockQuantity());
-                    errorLabel.setVisible(true);
-                    return;
-                }
-                items.add(new InventoryService.BulkDeductionItem(p.getId(), q, r.reasonCombo.getValue(), "Bulk deduction"));
-            }
-
-            if (items.isEmpty()) {
-                errorLabel.setText("At least one deduction item is required.");
-                errorLabel.setVisible(true);
-                return;
-            }
-
-            submitBtn.setDisable(true);
-            submitBtn.setText("Deducting...");
-
-            AppExecutor.execute(() -> {
-                try {
-                    List<StockMovement> saved = inventoryService.bulkDeduct(items, currentUser);
-                    Platform.runLater(() -> {
-                        ViewNavigator.hideOverlayDialog();
-                        ViewNavigator.showToast("Successfully deducted " + saved.size() + " items in batch.", false);
-                        loadDataAsync();
-                    });
-                } catch (Exception ex) {
-                    Platform.runLater(() -> {
-                        submitBtn.setDisable(false);
-                        submitBtn.setText("Deduct All");
-                        errorLabel.setText(ex.getMessage());
-                        errorLabel.setVisible(true);
-                    });
-                }
-            });
-        });
-
-        dialog.setFooterButtons(cancelBtn, submitBtn);
-        dialog.show();
+    private record TypeFilterOption(String code, String label) {
+        @Override
+        public String toString() {
+            return label;
+        }
     }
 
-    private record BulkRow(HBox rowNode, ComboBox<Product> prodCombo, TextField qtyField, ComboBox<String> reasonCombo) {}
-   
     private void openMovementHistoryDialog(Product filterProduct) {
         int orgId = (currentUser != null && currentUser.getOrganizationId() > 0) ? currentUser.getOrganizationId() : 1;
         String title = filterProduct != null ? "Stock History: " + filterProduct.getName() : "Global Stock Movement History";
@@ -865,8 +745,13 @@ public class InventoryView extends VBox implements Disposable {
         HBox histFilters = new HBox(12);
         histFilters.setAlignment(Pos.CENTER_LEFT);
 
-        ComboBox<String> typeFilter = new ComboBox<>();
-        typeFilter.getItems().addAll("ALL", "IN", "OUT", "ADJUSTMENT");
+        ComboBox<TypeFilterOption> typeFilter = new ComboBox<>();
+        typeFilter.getItems().addAll(
+                new TypeFilterOption("ALL", "All"),
+                new TypeFilterOption("IN", TYPE_LABELS.getOrDefault("IN", "Stock In")),
+                new TypeFilterOption("OUT", TYPE_LABELS.getOrDefault("OUT", "Stock Out")),
+                new TypeFilterOption("ADJUSTMENT", TYPE_LABELS.getOrDefault("ADJUSTMENT", "Adjustment"))
+        );
         typeFilter.getSelectionModel().selectFirst();
         typeFilter.getStyleClass().add("combo-box");
         typeFilter.setPrefWidth(140);
@@ -897,18 +782,20 @@ public class InventoryView extends VBox implements Disposable {
 
         TableColumn<StockMovement, String> typeCol = new TableColumn<>("Type");
         typeCol.setCellValueFactory(m -> new SimpleStringProperty(m.getValue().getMovementType()));
-        typeCol.setPrefWidth(80);
+        typeCol.setPrefWidth(105);
         typeCol.setCellFactory(c -> new TableCell<>() {
             @Override
             protected void updateItem(String t, boolean empty) {
                 super.updateItem(t, empty);
                 if (empty || t == null) setGraphic(null);
                 else {
-                    Badge b = switch (t.toUpperCase()) {
-                        case "IN" -> Badge.success("IN");
-                        case "OUT" -> Badge.danger("OUT");
-                        case "ADJUSTMENT" -> Badge.info("ADJ");
-                        default -> Badge.neutral(t);
+                    String upper = t.toUpperCase();
+                    String label = TYPE_LABELS.getOrDefault(upper, t);
+                    Badge b = switch (upper) {
+                        case "IN" -> Badge.success(label);
+                        case "OUT" -> Badge.danger(label);
+                        case "ADJUSTMENT" -> Badge.info(label);
+                        default -> Badge.neutral(label);
                     };
                     setGraphic(b);
                 }
@@ -926,7 +813,8 @@ public class InventoryView extends VBox implements Disposable {
         table.getColumns().addAll(List.of(dateCol, refCol, prodCol, typeCol, reasonCol, qtyCol));
 
         Runnable fetchMovements = () -> {
-            String selectedType = typeFilter.getValue();
+            TypeFilterOption selectedOpt = typeFilter.getValue();
+            String selectedType = selectedOpt != null ? selectedOpt.code() : "ALL";
             String q = searchMovements.getText();
             Integer pId = filterProduct != null ? filterProduct.getId() : null;
 
@@ -951,15 +839,11 @@ public class InventoryView extends VBox implements Disposable {
         dialog.show();
     }
 
-    private HBox createIconLabel(String svgPath, String text) {
-        HBox box = new HBox(6);
-        box.setAlignment(Pos.CENTER);
+    private SVGPath createIcon(String svgPath) {
         SVGPath icon = new SVGPath();
         icon.setContent(svgPath);
         icon.getStyleClass().add("dialog-close-icon");
-        Label lbl = new Label(text);
-        box.getChildren().addAll(icon, lbl);
-        return box;
+        return icon;
     }
 
     @Override

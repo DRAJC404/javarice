@@ -5,8 +5,11 @@ import com.bai.inventory.model.StockMovement;
 import com.bai.inventory.service.AuthService;
 
 import java.sql.*;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class StockMovementDao {
@@ -315,5 +318,63 @@ public class StockMovementDao {
             System.err.println("[StockMovementDao] Error counting movements: " + e.getMessage());
         }
         return 0;
+    }
+
+    public List<StockMovement> findMovementsByDate(int organizationId, LocalDate date) {
+        int orgId = organizationId > 0 ? organizationId : resolveOrganizationId(0);
+        List<StockMovement> list = new ArrayList<>();
+        String sql = "SELECT sm.id, sm.organization_id, sm.reference_no, sm.product_id, p.name AS product_name, p.sku AS product_sku, " +
+                     "sm.user_id, u.full_name AS user_name, sm.movement_type, sm.quantity, sm.reason, " +
+                     "sm.previous_stock, sm.new_stock, sm.undone_by_movement_id, sm.notes, sm.created_at " +
+                     "FROM stock_movements sm " +
+                     "JOIN products p ON sm.product_id = p.id " +
+                     "JOIN users u ON sm.user_id = u.id " +
+                     "WHERE sm.organization_id = ? AND DATE(sm.created_at) = ? " +
+                     "ORDER BY sm.created_at DESC";
+
+        try (Connection conn = DatabaseConfig.getConnection(orgId);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, orgId);
+            stmt.setDate(2, Date.valueOf(date));
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapResultSet(rs));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[StockMovementDao] Error querying movements by date: " + e.getMessage());
+        }
+        return list;
+    }
+
+    public Map<LocalDate, Integer> countMovementsByDateInMonth(int organizationId, int year, int month) {
+        int orgId = organizationId > 0 ? organizationId : resolveOrganizationId(0);
+        Map<LocalDate, Integer> map = new HashMap<>();
+        String sql = "SELECT DATE(created_at) AS m_date, COUNT(*) AS cnt " +
+                     "FROM stock_movements " +
+                     "WHERE organization_id = ? " +
+                     "  AND EXTRACT(YEAR FROM created_at) = ? " +
+                     "  AND EXTRACT(MONTH FROM created_at) = ? " +
+                     "GROUP BY DATE(created_at)";
+
+        try (Connection conn = DatabaseConfig.getConnection(orgId);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, orgId);
+            stmt.setInt(2, year);
+            stmt.setInt(3, month);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Date d = rs.getDate("m_date");
+                    if (d != null) {
+                        map.put(d.toLocalDate(), rs.getInt("cnt"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[StockMovementDao] Error counting movements by month: " + e.getMessage());
+        }
+        return map;
     }
 }
