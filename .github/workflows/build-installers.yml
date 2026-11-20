@@ -1,0 +1,244 @@
+name: Build & Publish Native Installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-matrix:
+    name: Build Installer (${{ matrix.platform }}-${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            arch: x64
+          - os: macos-latest
+            platform: macos
+            arch: arm64
+          - os: macos-13
+            platform: macos
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Install Linux packaging tools
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot binutils
+
+      - name: Build JAR package with Maven
+        working-directory: desktop
+        run: |
+          mvn clean package -DskipTests
+
+      - name: Package with jpackage (Windows)
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          
+          jpackage \
+            --input desktop/target/ \
+            --name bAI \
+            --main-jar bai-inventory-1.0-SNAPSHOT.jar \
+            --main-class com.bai.inventory.Main \
+            --type exe \
+            --app-version "$VERSION" \
+            --vendor "bAI Systems" \
+            --dest dist/
+          
+          jpackage \
+            --input desktop/target/ \
+            --name bAI \
+            --main-jar bai-inventory-1.0-SNAPSHOT.jar \
+            --main-class com.bai.inventory.Main \
+            --type msi \
+            --app-version "$VERSION" \
+            --vendor "bAI Systems" \
+            --dest dist/
+
+      - name: Package with jpackage (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          jpackage \
+            --input desktop/target/ \
+            --name bAI \
+            --main-jar bai-inventory-1.0-SNAPSHOT.jar \
+            --main-class com.bai.inventory.Main \
+            --type dmg \
+            --app-version "$VERSION" \
+            --vendor "bAI Systems" \
+            --dest dist/
+
+      - name: Package with jpackage (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          
+          jpackage \
+            --input desktop/target/ \
+            --name bai \
+            --main-jar bai-inventory-1.0-SNAPSHOT.jar \
+            --main-class com.bai.inventory.Main \
+            --type deb \
+            --app-version "$VERSION" \
+            --vendor "bAI Systems" \
+            --dest dist/
+          
+          jpackage \
+            --input desktop/target/ \
+            --name bai \
+            --main-jar bai-inventory-1.0-SNAPSHOT.jar \
+            --main-class com.bai.inventory.Main \
+            --type rpm \
+            --app-version "$VERSION" \
+            --vendor "bAI Systems" \
+            --dest dist/
+
+      - name: Compute SHA-256 Checksums & Metadata
+        shell: bash
+        run: |
+          mkdir -p metadata
+          for file in dist/*; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" > "$file.sha256"
+              echo "Built asset: $file"
+              cat "$file.sha256"
+            fi
+          done
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/
+
+  publish-release:
+    name: Publish Release & Notify API
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-dist
+
+      - name: Flatten artifacts & calculate checksums
+        id: prep
+        run: |
+          mkdir -p release-files
+          find all-dist -type f -exec cp {} release-files/ \;
+          ls -la release-files
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" release-files/* \
+            --title "bAI ${{ github.ref_name }}" \
+            --notes "Production build for tag ${{ github.ref_name }}"
+
+      - name: Notify bAI API of New Release
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL || 'https://api.bai-pos.com' }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          python3 -c "
+          import os, json, glob, hashlib, urllib.request
+
+          tag = os.environ['TAG_NAME']
+          version = tag.lstrip('v')
+          api_base = os.environ['API_BASE_URL'].rstrip('/')
+          admin_key = os.environ['ADMIN_API_KEY']
+
+          files = glob.glob('release-files/*')
+          assets = []
+
+          for f in files:
+              fname = os.path.basename(f)
+              if fname.endswith('.sha256'):
+                  continue
+              
+              size = os.path.getsize(f)
+              with open(f, 'rb') as fp:
+                  sha = hashlib.sha256(fp.read()).hexdigest()
+
+              lower = fname.lower()
+              platform = 'linux'
+              arch = 'x64'
+              kind = 'appimage'
+
+              if lower.endswith('.exe'):
+                  platform, arch, kind = 'windows', 'x64', 'exe'
+              elif lower.endswith('.msi'):
+                  platform, arch, kind = 'windows', 'x64', 'msi'
+              elif lower.endswith('.dmg'):
+                  platform = 'macos'
+                  kind = 'dmg'
+                  arch = 'arm64' if 'arm64' in lower or 'aarch64' in lower else 'x64'
+              elif lower.endswith('.deb'):
+                  platform, arch, kind = 'linux', 'x64', 'deb'
+              elif lower.endswith('.rpm'):
+                  platform, arch, kind = 'linux', 'x64', 'rpm'
+
+              download_url = f'https://github.com/${{ github.repository }}/releases/download/{tag}/{fname}'
+              assets.append({
+                  'platform': platform,
+                  'arch': arch,
+                  'kind': kind,
+                  'file_name': fname,
+                  'download_url': download_url,
+                  'sha256': sha,
+                  'size_bytes': size
+              })
+
+          payload = {
+              'version': version,
+              'tag_name': tag,
+              'name': f'bAI {version}',
+              'notes': f'Official release {tag} with native Windows, macOS, and Linux installers.',
+              'is_prerelease': False,
+              'is_published': True,
+              'assets': assets
+          }
+
+          req = urllib.request.Request(
+              f'{api_base}/api/admin/releases',
+              data=json.dumps(payload).encode('utf-8'),
+              headers={
+                  'Content-Type': 'application/json',
+                  'X-API-Key': admin_key
+              },
+              method='POST'
+          )
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  print('API release sync status:', resp.status)
+          except Exception as e:
+              print('Warning: could not notify API:', e)
+          "
