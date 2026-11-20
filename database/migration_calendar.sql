@@ -1,6 +1,6 @@
--- ============================================================================
--- Migration: Add calendar_events table
--- ============================================================================
+
+
+
 
 CREATE TABLE IF NOT EXISTS calendar_events (
     id SERIAL PRIMARY KEY,

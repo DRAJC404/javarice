@@ -728,9 +728,9 @@ SELECT setval('join_codes_id_seq', (SELECT COALESCE(MAX(id), 1) FROM join_codes)
 SELECT setval('audit_log_id_seq', (SELECT COALESCE(MAX(id), 1) FROM audit_log));
 
 
--- ============================================================================
--- CALENDAR EVENTS TABLE
--- ============================================================================
+
+
+
 CREATE TABLE IF NOT EXISTS calendar_events (
     id SERIAL PRIMARY KEY,
     organization_id INT NOT NULL DEFAULT 1 REFERENCES organizations(id) ON DELETE CASCADE,
