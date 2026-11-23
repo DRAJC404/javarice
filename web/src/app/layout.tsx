@@ -19,9 +19,22 @@ const jetbrainsMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "bAI: smarter stock tracking, zero manual counting",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://bai-pos.com"),
+  title: "bAI: Smarter Stock Tracking, Zero Manual Counting",
   description:
     "bAI is a desktop inventory app that tracks stock deductions automatically and warns you before items run out. Available for Windows, macOS and Linux.",
+  openGraph: {
+    title: "bAI — Smarter Stock Tracking, Zero Manual Counting",
+    description: "Desktop POS & automated inventory intelligence. Tracks deductions in real-time, alerts on low stock.",
+    url: "https://bai-pos.com",
+    siteName: "bAI Systems",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "bAI — Smarter Stock Tracking",
+    description: "Native desktop retail and inventory platform with zero manual counting.",
+  },
 };
 
 export const viewport: Viewport = {

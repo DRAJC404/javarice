@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+.git
+backend/data
+backend/*.db
+backend/__pycache__
+backend/.pytest_cache
+*.log

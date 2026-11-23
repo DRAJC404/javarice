@@ -4,8 +4,21 @@ import { DownloadButton } from "./DownloadButton";
 
 export function Hero() {
   return (
-    <section id="top" aria-labelledby="hero-title" className="overflow-x-clip">
-      <div className="container-page grid items-center gap-12 py-16 wide:grid-cols-[5fr_7fr] wide:gap-12 wide:py-24">
+    <section
+      id="top"
+      aria-labelledby="hero-title"
+      className="relative overflow-x-clip bg-gradient-to-b from-[#EEF4FF] via-[#F8FAFF] to-[#F4F7FD] border-b border-line/60"
+    >
+      <div
+        className="pointer-events-none absolute -left-40 top-0 h-[480px] w-[480px] rounded-full bg-primary/10 blur-[100px]"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute right-0 top-1/4 h-[420px] w-[420px] rounded-full bg-blue-300/20 blur-[120px]"
+        aria-hidden="true"
+      />
+
+      <div className="container-page relative z-10 grid items-center gap-12 py-16 wide:grid-cols-[5fr_7fr] wide:gap-12 wide:py-24">
         <div>
           <h1
             id="hero-title"
