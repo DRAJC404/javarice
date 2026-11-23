@@ -33,7 +33,7 @@ def normalize_arch(arch: str) -> str:
     return a
 
 
-@router.get("/{platform}/{arch}")
+@router.api_route("/{platform}/{arch}", methods=["GET", "HEAD"])
 async def download_installer(
     platform: str,
     arch: str,
@@ -83,7 +83,11 @@ async def download_installer(
     user_agent = request.headers.get("user-agent", "")[:500]
     referer = request.headers.get("referer", "")[:500]
 
-    if not (target_asset.download_url.startswith("https://") or target_asset.download_url.startswith("http://")):
+    if not (
+        target_asset.download_url.startswith("https://")
+        or target_asset.download_url.startswith("http://")
+        or target_asset.download_url.startswith("/")
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Insecure or invalid download URL destination.",
