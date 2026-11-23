@@ -1,6 +1,3 @@
-
-
-
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 const nextConfig = {
@@ -8,7 +5,6 @@ const nextConfig = {
   output: "export",
   basePath,
   images: {
-    
     unoptimized: true,
   },
 };

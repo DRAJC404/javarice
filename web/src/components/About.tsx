@@ -27,18 +27,25 @@ const rows = [
 
 export function About() {
   return (
-    <section id="about" aria-labelledby="about-title">
-      <div className="container-page py-16 wide:py-24">
-        <h2 id="about-title" className="sr-only">
-          About bAI
-        </h2>
-        <div className="space-y-16 wide:space-y-24">
+    <section id="about" aria-labelledby="about-title" className="bg-[#F4F7FD] py-16 wide:py-24 border-b border-line">
+      <div className="container-page">
+        <div className="mb-12 text-center">
+          <span className="text-xs font-semibold uppercase tracking-widest text-primary">Core Capabilities</span>
+          <h2 id="about-title" className="mt-2 text-[32px] font-semibold leading-[1.15] tracking-[-0.02em] text-navy sm:text-[40px]">
+            Engineered for High-Velocity Retail
+          </h2>
+          <p className="mt-3 text-base text-muted max-w-xl mx-auto">
+            Say goodbye to end-of-month manual tallying. bAI keeps physical stock and digital counts permanently synchronized.
+          </p>
+        </div>
+
+        <div className="space-y-8 wide:space-y-10">
           {rows.map((row, i) => {
             const flipped = i % 2 === 1;
             return (
               <article
                 key={row.number}
-                className="about-row group grid items-center gap-8 wide:grid-cols-2 wide:gap-16"
+                className="about-row group grid items-center gap-8 rounded-2xl border border-line bg-white p-6 sm:p-10 shadow-sm hover:shadow-md transition-shadow wide:grid-cols-2 wide:gap-16"
               >
                 <div className={flipped ? "wide:order-2" : undefined}>
                   <p className="about-number text-[16px] font-semibold text-primary">{row.number}</p>

@@ -1,4 +1,5 @@
 import { About } from "@/components/About";
+import { CtaBanner } from "@/components/CtaBanner";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/Hero";
 import { Install } from "@/components/Install";
@@ -14,6 +15,7 @@ export default function Home() {
       <main id="main">
         <Hero />
         <About />
+        <CtaBanner />
         <Install />
       </main>
       <Footer />

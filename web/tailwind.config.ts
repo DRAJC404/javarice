@@ -5,7 +5,6 @@ const config: Config = {
   theme: {
     extend: {
       screens: {
-        
         wide: "900px",
       },
       colors: {

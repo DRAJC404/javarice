@@ -11,14 +11,14 @@ const { files } = site;
 
 function FileLink({ file, children }: { file: FileKey; children?: ReactNode }) {
   return (
-    <a href={downloadUrl(file)} className="text-link font-medium">
+    <a href={downloadUrl(file)} className="text-blue-400 hover:text-blue-300 font-medium underline underline-offset-4">
       {children ?? files[file]}
     </a>
   );
 }
 
 function Strong({ children }: { children: ReactNode }) {
-  return <strong className="font-semibold text-navy">{children}</strong>;
+  return <strong className="font-semibold text-white">{children}</strong>;
 }
 
 const openStep = (
@@ -139,15 +139,15 @@ export function Install() {
   }
 
   return (
-    <section id="install" aria-labelledby="install-title" className="border-y border-line bg-tint">
+    <section id="install" aria-labelledby="install-title" className="border-t border-slate-800 bg-[#0B1324] text-white">
       <div className="container-page py-16 wide:py-24">
         <h2
           id="install-title"
-          className="text-[32px] font-semibold leading-[1.15] tracking-[-0.02em] text-navy sm:text-[40px]"
+          className="text-[32px] font-semibold leading-[1.15] tracking-[-0.02em] text-white sm:text-[40px]"
         >
           How to install
         </h2>
-        <p className="mt-4 max-w-[560px] text-[17px] leading-[1.6] text-muted">
+        <p className="mt-4 max-w-[560px] text-[17px] leading-[1.6] text-slate-400">
           Choose your operating system and follow the steps.
         </p>
 
@@ -155,7 +155,7 @@ export function Install() {
           role="tablist"
           aria-label="Operating system"
           onKeyDown={onKeyDown}
-          className="mt-8 inline-flex rounded-[12px] border border-line bg-white p-1"
+          className="mt-8 inline-flex rounded-[12px] border border-slate-700 bg-slate-900/90 p-1"
         >
           {tabs.map((tab) => {
             const selected = tab === active;
@@ -172,7 +172,11 @@ export function Install() {
                 aria-controls={`panel-${tab}`}
                 tabIndex={selected ? 0 : -1}
                 onClick={() => setActive(tab)}
-                className={`os-tab ${selected ? "os-tab-active" : ""}`}
+                className={`rounded-[8px] px-4 py-2 text-[14px] font-medium transition-all ${
+                  selected
+                    ? "bg-primary text-white shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
               >
                 {osLabel[tab]}
               </button>
@@ -194,11 +198,11 @@ export function Install() {
                 <li key={i} className="install-step grid grid-cols-[32px_1fr] gap-4">
                   <span
                     aria-hidden="true"
-                    className="step-number flex h-8 w-8 items-center justify-center rounded-full border border-line bg-white text-[14px] font-semibold text-primary"
+                    className="step-number flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-[14px] font-semibold text-blue-400"
                   >
                     {i + 1}
                   </span>
-                  <p className="pt-1 text-[17px] leading-[1.6] text-muted">
+                  <p className="pt-1 text-[17px] leading-[1.6] text-slate-300">
                     <span className="sr-only">Step {i + 1}: </span>
                     {step}
                   </p>
@@ -206,14 +210,14 @@ export function Install() {
               ))}
             </ol>
 
-            <div className="code-block rounded-[12px] bg-navy p-2">
+            <div className="code-block rounded-[12px] border border-slate-800 bg-[#050A14] p-2 shadow-2xl">
               {content[tab].snippets.map((s, i) => (
-                <div key={s.label} className={i > 0 ? "border-t border-white/10" : undefined}>
+                <div key={s.label} className={i > 0 ? "border-t border-slate-800" : undefined}>
                   <div className="flex items-center justify-between gap-4 px-4 pt-3">
-                    <span className="text-[13px] font-medium text-[#A9B6D3]">{s.label}</span>
+                    <span className="text-[13px] font-medium text-slate-400">{s.label}</span>
                     <CopyButton text={s.code} label={s.label} />
                   </div>
-                  <pre className="overflow-x-auto px-4 pb-4 pt-2 font-mono text-[14px] leading-[1.7] text-[#E3E9F5]">
+                  <pre className="overflow-x-auto px-4 pb-4 pt-2 font-mono text-[14px] leading-[1.7] text-blue-100">
                     <code>{s.code}</code>
                   </pre>
                 </div>
