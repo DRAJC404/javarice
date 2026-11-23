@@ -127,10 +127,6 @@ export default function DownloadPage() {
             <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
               <div className="divide-y divide-line">
                 {assets.map((asset) => {
-                  const downloadHref = release?.assets?.length
-                    ? getDownloadApiUrl(asset.platform, asset.arch, asset.kind)
-                    : asset.download_url;
-
                   return (
                     <div key={`${asset.platform}-${asset.arch}-${asset.kind}`} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-tint/40 transition-colors">
                       <div>
@@ -158,8 +154,9 @@ export default function DownloadPage() {
                       </div>
 
                       <a
-                        href={downloadHref}
-                        className="btn-primary self-start sm:self-auto h-9 px-4 text-xs font-medium whitespace-nowrap"
+                        href={asset.download_url}
+                        download={asset.file_name}
+                        className="btn-primary self-start sm:self-auto h-9 px-4 text-xs font-medium whitespace-nowrap inline-flex items-center gap-1.5"
                       >
                         Download .{asset.kind}
                       </a>

@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import os
 from datetime import datetime, timezone
 from sqlalchemy import select
 from app.database import AsyncSessionLocal, engine, set_tenant_context
@@ -16,6 +17,9 @@ def mock_sha256(seed: str) -> str:
 
 async def seed():
     print("[Seed] Initializing seed data for bAI...")
+    from app.database import Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     async with AsyncSessionLocal() as session:
         roles_data = [
             (1, "OWNER", "Business Owner / Administrator"),
@@ -69,13 +73,14 @@ async def seed():
             )
             session.add(rel)
             await session.flush()
+            dl_base = os.getenv("APP_RELEASES_DOWNLOAD_BASE", "http://localhost:3000/downloads")
             assets_data = [
                 {
                     "platform": "windows",
                     "arch": "x64",
                     "kind": "exe",
                     "file_name": "bAI-Setup-1.0.0.exe",
-                    "download_url": "https://github.com/bai-inventory/bai/releases/download/v1.0.0/bAI-Setup-1.0.0.exe",
+                    "download_url": f"{dl_base}/bAI-Setup-1.0.0.exe",
                     "sha256": mock_sha256("bAI-Setup-1.0.0.exe-windows-x64"),
                     "size_bytes": 78_643_200,
                 },
@@ -84,7 +89,7 @@ async def seed():
                     "arch": "x64",
                     "kind": "msi",
                     "file_name": "bAI-1.0.0.msi",
-                    "download_url": "https://github.com/bai-inventory/bai/releases/download/v1.0.0/bAI-1.0.0.msi",
+                    "download_url": f"{dl_base}/bAI.msi",
                     "sha256": mock_sha256("bAI-1.0.0.msi-windows-x64"),
                     "size_bytes": 79_120_000,
                 },
@@ -93,7 +98,7 @@ async def seed():
                     "arch": "arm64",
                     "kind": "dmg",
                     "file_name": "bAI-1.0.0-arm64.dmg",
-                    "download_url": "https://github.com/bai-inventory/bai/releases/download/v1.0.0/bAI-1.0.0-arm64.dmg",
+                    "download_url": f"{dl_base}/bAI-arm64.dmg",
                     "sha256": mock_sha256("bAI-1.0.0-arm64.dmg-macos-arm64"),
                     "size_bytes": 82_450_000,
                 },
@@ -102,7 +107,7 @@ async def seed():
                     "arch": "x64",
                     "kind": "dmg",
                     "file_name": "bAI-1.0.0-x64.dmg",
-                    "download_url": "https://github.com/bai-inventory/bai/releases/download/v1.0.0/bAI-1.0.0-x64.dmg",
+                    "download_url": f"{dl_base}/bAI-x64.dmg",
                     "sha256": mock_sha256("bAI-1.0.0-x64.dmg-macos-x64"),
                     "size_bytes": 84_100_000,
                 },
@@ -111,7 +116,7 @@ async def seed():
                     "arch": "x64",
                     "kind": "deb",
                     "file_name": "bai_1.0.0_amd64.deb",
-                    "download_url": "https://github.com/bai-inventory/bai/releases/download/v1.0.0/bai_1.0.0_amd64.deb",
+                    "download_url": f"{dl_base}/bai_1.0.0_amd64.deb",
                     "sha256": mock_sha256("bai_1.0.0_amd64.deb-linux-x64"),
                     "size_bytes": 73_200_000,
                 },
@@ -120,7 +125,7 @@ async def seed():
                     "arch": "x64",
                     "kind": "rpm",
                     "file_name": "bai-1.0.0.x86_64.rpm",
-                    "download_url": "https://github.com/bai-inventory/bai/releases/download/v1.0.0/bai-1.0.0.x86_64.rpm",
+                    "download_url": f"{dl_base}/bAI.rpm",
                     "sha256": mock_sha256("bai-1.0.0.x86_64.rpm-linux-x64"),
                     "size_bytes": 74_500_000,
                 },
@@ -129,7 +134,7 @@ async def seed():
                     "arch": "x64",
                     "kind": "appimage",
                     "file_name": "bAI-1.0.0.AppImage",
-                    "download_url": "https://github.com/bai-inventory/bai/releases/download/v1.0.0/bAI-1.0.0.AppImage",
+                    "download_url": f"{dl_base}/bAI.AppImage",
                     "sha256": mock_sha256("bAI-1.0.0.AppImage-linux-x64"),
                     "size_bytes": 76_800_000,
                 },

@@ -11,7 +11,7 @@ const { files } = site;
 
 function FileLink({ file, children }: { file: FileKey; children?: ReactNode }) {
   return (
-    <a href={downloadUrl(file)} className="text-blue-400 hover:text-blue-300 font-medium underline underline-offset-4">
+    <a href={downloadUrl(file)} download={files[file]} className="text-blue-400 hover:text-blue-300 font-medium underline underline-offset-4">
       {children ?? files[file]}
     </a>
   );
